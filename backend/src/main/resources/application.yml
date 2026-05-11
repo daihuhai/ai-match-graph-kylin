@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: aimap-backend
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  # GreatSQL 与 MySQL 协议兼容，使用 mysql-connector-j + Flyway 建表与种子数据
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:aimap}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Shanghai
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+ark:
+  api-key: ${ARK_API_KEY:}
+  base-url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
+  model: ${ARK_MODEL:doubao-seed-2-0-lite-260428}

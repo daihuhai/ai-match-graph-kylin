@@ -1,0 +1,24 @@
+# 本地开发用 MySQL 8（与 GreatSQL / JDBC mysql 协议兼容）。生产环境请改用真实 GreatSQL 实例与账号。
+# 启动：docker compose up -d
+# 默认映射主机端口 3307，避免与本机已安装的 MySQL(3306) 冲突。
+services:
+  aimap-db:
+    image: mysql:8.0
+    container_name: aimap-mysql-dev
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: aimap
+      MYSQL_USER: aimap
+      MYSQL_PASSWORD: aimap_dev
+      MYSQL_ROOT_PASSWORD: aimap_root_local_only
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 25s
