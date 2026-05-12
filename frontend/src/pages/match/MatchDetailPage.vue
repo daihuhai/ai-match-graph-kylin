@@ -124,7 +124,7 @@ const load = async () => {
         {
           recordId: recordId.value,
           title: prev?.title ?? `匹配记录 ${recordId.value}`,
-          org: prev?.org ?? (isCompany.value ? '候选人推荐' : '职位推荐'),
+          org: prev?.org ?? (isCompany.value ? '人才库推荐' : '人才市场'),
           score: detail.value.score,
         },
         side.value,
@@ -225,7 +225,7 @@ onMounted(load)
                 title="RIASEC 雷达图"
                 :person-values="riasecPersonValues"
                 :target-values="riasecTargetValues"
-                :labels="{ person: isCompany ? '候选人' : '你', target: isCompany ? '岗位' : '岗位' }"
+                :labels="{ person: isCompany ? '人才库' : '你', target: isCompany ? '岗位' : '岗位' }"
               />
             </div>
           </el-card>

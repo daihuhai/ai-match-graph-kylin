@@ -20,6 +20,7 @@ const file = ref<File | null>(null)
 const fileList = ref<any[]>([])
 const authorized = ref(false)
 const loading = ref(false)
+const publishToTalentPool = ref(false)
 
 const validateFile = (raw: File) => {
   const okType = /\.(pdf|doc|docx)$/i.test(raw.name)
@@ -52,7 +53,11 @@ const submit = async () => {
 
   loading.value = true
   try {
-    const { docId } = await uploadDocument({ file: file.value, docType: docType.value })
+    const { docId } = await uploadDocument({
+      file: file.value,
+      docType: docType.value,
+      publishToTalentPool: !isCompany.value ? publishToTalentPool.value : false,
+    })
     audit.hydrate()
     audit.add({
       module: 'document.upload',
@@ -111,6 +116,10 @@ const submit = async () => {
           本人/本单位已获得该文档相关主体授权，并同意隐私条款与数据使用说明
         </el-checkbox>
 
+        <el-checkbox v-if="!isCompany" v-model="publishToTalentPool">
+          解析完成后自动上传至系统人才库，供企业端在「人才库推荐」中筛选（需已登录个人账号）
+        </el-checkbox>
+
         <el-upload
           drag
           :auto-upload="false"
@@ -124,7 +133,7 @@ const submit = async () => {
         >
           <div class="py-8">
             <div class="text-sm font-semibold text-zinc-900">拖拽文件到此处，或点击选择</div>
-            <div class="mt-1 text-xs text-zinc-500">无后端时默认走 mock；设置 VITE_USE_MOCK=false 可切到真实接口</div>
+            <div class="mt-1 text-xs text-zinc-500">需后端 8080；若设置 VITE_USE_MOCK=false 则全部走真实接口。</div>
           </div>
         </el-upload>
 

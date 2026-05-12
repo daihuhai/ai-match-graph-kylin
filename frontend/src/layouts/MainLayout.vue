@@ -17,14 +17,14 @@ const menuItems = computed(() => {
       { index: `${basePath.value}/dashboard`, label: '工作台' },
       { index: `${basePath.value}/doc/list`, label: '文档中心' },
       { index: `${basePath.value}/graph/job-001`, label: '职位图谱' },
-      { index: `${basePath.value}/match/candidates`, label: '候选人推荐' },
+      { index: `${basePath.value}/match/candidates`, label: '人才库推荐' },
     ]
   }
   return [
     { index: `${basePath.value}/dashboard`, label: '工作台' },
     { index: `${basePath.value}/doc/list`, label: '文档中心' },
     { index: `${basePath.value}/graph/person-001`, label: '能力图谱' },
-    { index: `${basePath.value}/match/jobs`, label: '职位推荐' },
+    { index: `${basePath.value}/match/jobs`, label: '人才市场' },
   ]
 })
 

@@ -1,13 +1,13 @@
 package com.aimap.backend.service;
 
 import com.aimap.backend.auth.BearerUserResolver.LoggedUser;
-import com.aimap.backend.entity.CandidateCatalogEntity;
 import com.aimap.backend.entity.DocumentEntity;
-import com.aimap.backend.entity.JobCatalogEntity;
+import com.aimap.backend.entity.JobMarketEntity;
+import com.aimap.backend.entity.TalentPoolEntity;
 import com.aimap.backend.entity.UserEntity;
-import com.aimap.backend.repo.CandidateCatalogRepository;
 import com.aimap.backend.repo.DocumentRepository;
-import com.aimap.backend.repo.JobCatalogRepository;
+import com.aimap.backend.repo.JobMarketRepository;
+import com.aimap.backend.repo.TalentPoolRepository;
 import com.aimap.backend.repo.UserRepository;
 import com.aimap.backend.util.JsonHelper;
 import com.aimap.backend.util.RiasecMath;
@@ -19,8 +19,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class InMemoryDataService {
@@ -37,11 +39,15 @@ public class InMemoryDataService {
       String resumeCritique,
       Map<String, Integer> resumeHolland,
       String jobCritique,
-      Map<String, Integer> jobHolland) {
+      Map<String, Integer> jobHolland,
+      String ownerUserType,
+      String ownerAccount,
+      List<String> resumeSkills) {
 
     public DocumentTask {
       resumeHolland = resumeHolland == null ? Map.of() : Map.copyOf(resumeHolland);
       jobHolland = jobHolland == null ? Map.of() : Map.copyOf(jobHolland);
+      resumeSkills = resumeSkills == null ? List.of() : List.copyOf(resumeSkills);
     }
   }
 
@@ -57,42 +63,85 @@ public class InMemoryDataService {
 
   private final UserRepository userRepository;
   private final DocumentRepository documentRepository;
-  private final JobCatalogRepository jobCatalogRepository;
-  private final CandidateCatalogRepository candidateCatalogRepository;
+  private final JobMarketRepository jobMarketRepository;
+  private final TalentPoolRepository talentPoolRepository;
+  private final PasswordEncoder passwordEncoder;
 
   public InMemoryDataService(
       UserRepository userRepository,
       DocumentRepository documentRepository,
-      JobCatalogRepository jobCatalogRepository,
-      CandidateCatalogRepository candidateCatalogRepository) {
+      JobMarketRepository jobMarketRepository,
+      TalentPoolRepository talentPoolRepository,
+      PasswordEncoder passwordEncoder) {
     this.userRepository = userRepository;
     this.documentRepository = documentRepository;
-    this.jobCatalogRepository = jobCatalogRepository;
-    this.candidateCatalogRepository = candidateCatalogRepository;
+    this.jobMarketRepository = jobMarketRepository;
+    this.talentPoolRepository = talentPoolRepository;
+    this.passwordEncoder = passwordEncoder;
   }
 
   @Transactional
-  public void register(String account, String password, String userType) {
+  public void register(String account, String password, String userType, String phone, String email) {
     if (userRepository.existsByUserTypeAndAccount(userType, account)) {
       throw new IllegalArgumentException("账号已存在");
+    }
+    String p = normalizeNullable(phone);
+    String e = normalizeNullable(email);
+    if (StringUtils.hasText(p) && userRepository.existsByUserTypeAndPhone(userType, p)) {
+      throw new IllegalArgumentException("该手机号已被注册");
+    }
+    if (StringUtils.hasText(e) && userRepository.existsByUserTypeAndEmail(userType, e)) {
+      throw new IllegalArgumentException("该邮箱已被注册");
     }
     UserEntity u = new UserEntity();
     u.setUserType(userType);
     u.setAccount(account);
-    u.setPassword(password);
+    u.setPhone(p);
+    u.setEmail(e);
+    u.setPassword(passwordEncoder.encode(password));
     userRepository.save(u);
   }
 
   @Transactional(readOnly = true)
-  public User login(String account, String password, String userType) {
+  public User login(String loginId, String password, String userType) {
     UserEntity u =
-        userRepository
-            .findByUserTypeAndAccount(userType, account)
-            .orElseThrow(() -> new IllegalArgumentException("账号或密码错误"));
-    if (!u.getPassword().equals(password)) {
+        findUserForLogin(userType, loginId).orElseThrow(() -> new IllegalArgumentException("账号或密码错误"));
+    if (!passwordMatches(u.getPassword(), password)) {
       throw new IllegalArgumentException("账号或密码错误");
     }
     return new User(u.getAccount(), u.getPassword(), u.getUserType());
+  }
+
+  private Optional<UserEntity> findUserForLogin(String userType, String loginId) {
+    if (!StringUtils.hasText(loginId)) {
+      return Optional.empty();
+    }
+    String id = loginId.trim();
+    Optional<UserEntity> u = userRepository.findByUserTypeAndAccount(userType, id);
+    if (u.isEmpty()) {
+      u = userRepository.findByUserTypeAndPhone(userType, id);
+    }
+    if (u.isEmpty()) {
+      u = userRepository.findByUserTypeAndEmail(userType, id);
+    }
+    return u;
+  }
+
+  private boolean passwordMatches(String stored, String raw) {
+    if (!StringUtils.hasText(stored)) {
+      return false;
+    }
+    if (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$")) {
+      return passwordEncoder.matches(raw, stored);
+    }
+    return stored.equals(raw);
+  }
+
+  private static String normalizeNullable(String s) {
+    if (!StringUtils.hasText(s)) {
+      return null;
+    }
+    return s.trim();
   }
 
   @Transactional
@@ -105,6 +154,7 @@ public class InMemoryDataService {
       Map<String, Integer> resumeHolland,
       String jobCritique,
       Map<String, Integer> jobHolland,
+      List<String> resumeSkills,
       Optional<LoggedUser> uploader) {
     String id = "doc-" + UUID.randomUUID().toString().substring(0, 8);
     DocumentEntity d = new DocumentEntity();
@@ -118,6 +168,7 @@ public class InMemoryDataService {
     d.setJobCritique(jobCritique == null ? "" : jobCritique);
     d.setResumeHollandJson(JsonHelper.riasecToJson(resumeHolland));
     d.setJobHollandJson(JsonHelper.riasecToJson(jobHolland));
+    d.setResumeSkillsJson(JsonHelper.skillsToJson(resumeSkills));
     uploader.ifPresent(
         u -> {
           d.setOwnerUserType(u.userType());
@@ -174,7 +225,10 @@ public class InMemoryDataService {
         d.getResumeCritique() == null ? "" : d.getResumeCritique(),
         JsonHelper.parseRiasec(d.getResumeHollandJson()),
         d.getJobCritique() == null ? "" : d.getJobCritique(),
-        JsonHelper.parseRiasec(d.getJobHollandJson()));
+        JsonHelper.parseRiasec(d.getJobHollandJson()),
+        d.getOwnerUserType(),
+        d.getOwnerAccount(),
+        JsonHelper.parseSkills(d.getResumeSkillsJson()));
   }
 
   public static String statusByElapsed(long elapsed) {
@@ -210,19 +264,19 @@ public class InMemoryDataService {
   }
 
   private Map<String, Integer> defaultJobHollandFromDb() {
-    return jobCatalogRepository
+    return jobMarketRepository
         .findById("job-002")
-        .map(JobCatalogEntity::getRiasecJson)
+        .map(JobMarketEntity::getRiasecJson)
         .map(JsonHelper::parseRiasec)
         .filter(m -> !m.isEmpty())
         .orElse(DEFAULT_PERSON_HOLLAND);
   }
 
   @Transactional(readOnly = true)
-  public List<Map<String, Object>> recommendJobs(Optional<LoggedUser> user, int minScore) {
-    Map<String, Integer> p = personHollandForRecommend(user);
+  public List<Map<String, Object>> recommendJobsForHolland(Map<String, Integer> personHolland, int minScore) {
+    Map<String, Integer> p = personHolland == null || personHolland.isEmpty() ? DEFAULT_PERSON_HOLLAND : personHolland;
     List<Map<String, Object>> rows = new ArrayList<>();
-    for (JobCatalogEntity j : jobCatalogRepository.findAllByOrderByRecordIdAsc()) {
+    for (JobMarketEntity j : jobMarketRepository.findAllByOrderByRecordIdAsc()) {
       TalentEntity t = toTalent(j);
       int score = RiasecMath.similarity100(p, t.riasec());
       if (score >= minScore) {
@@ -239,10 +293,26 @@ public class InMemoryDataService {
   }
 
   @Transactional(readOnly = true)
+  public List<Map<String, Object>> recommendJobs(Optional<LoggedUser> user, int minScore) {
+    return recommendJobsForHolland(personHollandForRecommend(user), minScore);
+  }
+
+  @Transactional(readOnly = true)
+  public List<Map<String, Object>> recommendJobsForResumeDocument(String docId, int minScore) {
+    DocumentEntity d =
+        documentRepository.findById(docId).orElseThrow(() -> new IllegalArgumentException("文档不存在"));
+    if (!"RESUME".equals(d.getDocType())) {
+      throw new IllegalArgumentException("仅简历文档可计算与人才市场的岗位匹配");
+    }
+    Map<String, Integer> p = JsonHelper.parseRiasec(d.getResumeHollandJson());
+    return recommendJobsForHolland(p, minScore);
+  }
+
+  @Transactional(readOnly = true)
   public List<Map<String, Object>> recommendCandidates(Optional<LoggedUser> user, int minScore) {
     Map<String, Integer> jobH = companyJobHollandForRecommend(user);
     List<Map<String, Object>> rows = new ArrayList<>();
-    for (CandidateCatalogEntity c : candidateCatalogRepository.findAllByOrderByRecordIdAsc()) {
+    for (TalentPoolEntity c : talentPoolRepository.findByInPoolIsTrueOrderByRecordIdAsc()) {
       TalentEntity t = toTalent(c);
       int score = RiasecMath.similarity100(t.riasec(), jobH);
       if (score >= minScore) {
@@ -258,7 +328,7 @@ public class InMemoryDataService {
     return rows;
   }
 
-  private static TalentEntity toTalent(JobCatalogEntity j) {
+  private static TalentEntity toTalent(JobMarketEntity j) {
     return new TalentEntity(
         j.getRecordId(),
         j.getTitle(),
@@ -267,7 +337,7 @@ public class InMemoryDataService {
         JsonHelper.parseSkills(j.getSkillsJson()));
   }
 
-  private static TalentEntity toTalent(CandidateCatalogEntity c) {
+  private static TalentEntity toTalent(TalentPoolEntity c) {
     return new TalentEntity(
         c.getRecordId(),
         c.getTitle(),
@@ -278,12 +348,100 @@ public class InMemoryDataService {
 
   @Transactional(readOnly = true)
   public Optional<TalentEntity> findJob(String recordId) {
-    return jobCatalogRepository.findById(recordId).map(InMemoryDataService::toTalent);
+    return jobMarketRepository.findById(recordId).map(InMemoryDataService::toTalent);
   }
 
   @Transactional(readOnly = true)
   public Optional<TalentEntity> findCandidate(String recordId) {
-    return candidateCatalogRepository.findById(recordId).map(InMemoryDataService::toTalent);
+    return talentPoolRepository.findById(recordId).map(InMemoryDataService::toTalent);
+  }
+
+  @Transactional
+  public void upsertJobFromCompanyDocument(
+      String docId, String fileName, Map<String, Integer> jobHolland, List<String> skills, LoggedUser owner) {
+    if (!StringUtils.hasText(docId) || jobHolland == null || jobHolland.isEmpty()) {
+      return;
+    }
+    jobMarketRepository.deleteByDocumentId(docId);
+    JobMarketEntity j = new JobMarketEntity();
+    j.setRecordId(jobRecordIdFromDocId(docId));
+    j.setTitle(trimFileBaseName(fileName, 240));
+    j.setOrg("人才市场 · " + owner.account());
+    j.setRiasecJson(JsonHelper.riasecToJson(jobHolland));
+    j.setSkillsJson(JsonHelper.skillsToJson(skills));
+    j.setSource("COMPANY_DOC");
+    j.setDocumentId(docId);
+    j.setOwnerUserType(owner.userType());
+    j.setOwnerAccount(owner.account());
+    jobMarketRepository.save(j);
+  }
+
+  @Transactional
+  public void publishResumeToTalentPool(String docId, LoggedUser u) {
+    DocumentEntity d =
+        documentRepository.findById(docId).orElseThrow(() -> new IllegalArgumentException("任务不存在"));
+    assertDocOwnedByPerson(d, u);
+    Map<String, Integer> h = JsonHelper.parseRiasec(d.getResumeHollandJson());
+    if (h.isEmpty()) {
+      throw new IllegalArgumentException("尚未生成简历霍兰德数据，无法加入人才库");
+    }
+    List<String> skills = JsonHelper.parseSkills(d.getResumeSkillsJson());
+    String rid = talentRecordIdFromDocId(docId);
+    TalentPoolEntity row = talentPoolRepository.findByDocumentId(docId).orElseGet(TalentPoolEntity::new);
+    row.setRecordId(rid);
+    row.setTitle(buildTalentTitle(d.getFileName()));
+    row.setOrg("人才库 · " + u.account());
+    row.setRiasecJson(JsonHelper.riasecToJson(h));
+    row.setSkillsJson(JsonHelper.skillsToJson(skills));
+    row.setSource("USER_DOC");
+    row.setDocumentId(docId);
+    row.setOwnerUserType("PERSON");
+    row.setOwnerAccount(u.account());
+    row.setInPool(true);
+    talentPoolRepository.save(row);
+  }
+
+  @Transactional(readOnly = true)
+  public boolean isResumeInTalentPool(String docId) {
+    return talentPoolRepository.findByDocumentId(docId).filter(TalentPoolEntity::isInPool).isPresent();
+  }
+
+  private static void assertDocOwnedByPerson(DocumentEntity d, LoggedUser u) {
+    if (!"RESUME".equals(d.getDocType())) {
+      throw new IllegalArgumentException("仅简历可加入人才库");
+    }
+    if (!"PERSON".equals(u.userType())) {
+      throw new IllegalArgumentException("仅个人用户可加入人才库");
+    }
+    if (!StringUtils.hasText(d.getOwnerAccount()) || !d.getOwnerAccount().equals(u.account())) {
+      throw new IllegalArgumentException("只能为自己的简历文档执行该操作");
+    }
+  }
+
+  private static String jobRecordIdFromDocId(String docId) {
+    return "jm-" + docId.substring(4);
+  }
+
+  private static String talentRecordIdFromDocId(String docId) {
+    return "tp-" + docId.substring(4);
+  }
+
+  private static String trimFileBaseName(String fileName, int maxLen) {
+    if (!StringUtils.hasText(fileName)) {
+      return "岗位说明";
+    }
+    int dot = fileName.lastIndexOf('.');
+    String base = dot > 0 ? fileName.substring(0, dot) : fileName;
+    base = base.trim();
+    if (base.length() > maxLen) {
+      base = base.substring(0, maxLen);
+    }
+    return base.isEmpty() ? "岗位说明" : base;
+  }
+
+  private static String buildTalentTitle(String fileName) {
+    String base = trimFileBaseName(fileName, 220);
+    return "候选人：" + base;
   }
 
   public Map<String, Object> matchDetailForJob(String jobRecordId, Optional<LoggedUser> personUser) {
@@ -295,7 +453,7 @@ public class InMemoryDataService {
 
   public Map<String, Object> matchDetailForCandidate(String candRecordId, Optional<LoggedUser> companyUser) {
     TalentEntity cand =
-        findCandidate(candRecordId).orElseThrow(() -> new IllegalArgumentException("候选人记录不存在"));
+        findCandidate(candRecordId).orElseThrow(() -> new IllegalArgumentException("人才库记录不存在"));
     Map<String, Integer> jobH = companyJobHollandForRecommend(companyUser);
     return buildDetailMap(candRecordId, cand.riasec(), jobH, cand.skills(), false);
   }
@@ -322,7 +480,9 @@ public class InMemoryDataService {
             "rationales",
             List.of(
                 "霍兰德六维相似度约 " + similarity + "%，用于衡量人与岗（或岗与人）整体倾向一致性。",
-                personIsViewer ? "个人画像取自数据库中最近一次简历解析写入的霍兰德向量。" : "候选人画像来自人才库；岗位画像取自贵司最近一次 JD 解析写入数据库的霍兰德向量。")),
+                personIsViewer
+                    ? "个人画像取自数据库中最近一次简历解析写入的霍兰德向量。"
+                    : "候选人画像来自系统人才库；岗位画像取自贵司最近一次 JD 解析写入数据库的霍兰德向量。")),
         Map.entry(
             "evidences",
             List.of(

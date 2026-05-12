@@ -5,6 +5,7 @@ import com.aimap.backend.service.ArkLlmService;
 import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +22,13 @@ public class LlmController {
   }
 
   public record PromptReq(@NotBlank String text) {}
+
+  /** 不调用远端模型；用于部署后确认密钥是否已被进程加载（不返回任何密钥字段）。 */
+  @GetMapping("/status")
+  public ApiResponse<Map<String, Object>> status() {
+    return ApiResponse.ok(
+        Map.of("arkEnabled", arkLlmService.enabled(), "model", arkLlmService.getModel()));
+  }
 
   @PostMapping("/extract")
   public ApiResponse<Map<String, Object>> extract(@RequestBody @Validated PromptReq req) {

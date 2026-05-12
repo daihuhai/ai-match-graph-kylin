@@ -4,6 +4,7 @@
 # 后端构建产物与本地密钥
 /backend/target/
 /backend/.env.backend
+/backend/.env.backend.local
 
 # 前端构建产物（亦见 frontend/.gitignore）
 /frontend/node_modules/

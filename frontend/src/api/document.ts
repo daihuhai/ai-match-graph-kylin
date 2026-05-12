@@ -3,7 +3,11 @@ import { mockDocument } from '@/api/mock'
 import { isMockEnabled } from '@/api/env'
 import type { DocType, ParseResultVO } from '@/types/document'
 
-export async function uploadDocument(payload: { file: File; docType: DocType }): Promise<{ docId: string }> {
+export async function uploadDocument(payload: {
+  file: File
+  docType: DocType
+  publishToTalentPool?: boolean
+}): Promise<{ docId: string }> {
   if (isMockEnabled()) {
     const fileType = payload.file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC'
     return mockDocument.upload({ fileName: payload.file.name, fileType, docType: payload.docType })
@@ -12,10 +16,18 @@ export async function uploadDocument(payload: { file: File; docType: DocType }):
   const form = new FormData()
   form.append('file', payload.file)
   form.append('docType', payload.docType)
+  form.append('publishToTalentPool', payload.publishToTalentPool ? 'true' : 'false')
   return http.post('/document/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120_000,
   })
+}
+
+export async function publishResumeToTalentPool(docId: string): Promise<{ docId: string; talentPoolPublished: boolean }> {
+  if (isMockEnabled()) {
+    return mockDocument.publishTalentPool(docId)
+  }
+  return http.post(`/document/${encodeURIComponent(docId)}/talent-pool`, { publish: true })
 }
 
 export async function getDocumentStatus(docId: string): Promise<{ id: string; status: string }> {

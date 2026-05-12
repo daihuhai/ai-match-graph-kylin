@@ -24,6 +24,12 @@ public class UserEntity {
   @Column(nullable = false, length = 128)
   private String account;
 
+  @Column(length = 32)
+  private String phone;
+
+  @Column(length = 255)
+  private String email;
+
   @Column(nullable = false, length = 255)
   private String password;
 
@@ -55,6 +61,22 @@ public class UserEntity {
 
   public void setAccount(String account) {
     this.account = account;
+  }
+
+  public String getPhone() {
+    return phone;
+  }
+
+  public void setPhone(String phone) {
+    this.phone = phone;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
   }
 
   public String getPassword() {

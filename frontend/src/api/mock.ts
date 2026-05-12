@@ -1,4 +1,3 @@
-import type { UserType } from '@/stores/auth'
 import type { DocStatus, DocType, DocFileVO, ParseResultVO } from '@/types/document'
 import type { GraphData } from '@/types/graph'
 import type { MatchDetailVO, MatchListItem } from '@/types/match'
@@ -31,21 +30,6 @@ const writeDocTasks = (tasks: Record<string, DocTask>) => {
   getDataStorage().setItem(DOC_TASKS_KEY, JSON.stringify(tasks))
 }
 
-export const mockAuth = {
-  async login(payload: { account: string; password: string; userType: UserType }) {
-    const permissions =
-      payload.userType === 'ADMIN'
-        ? ['ADMIN_USERS_VIEW', 'ADMIN_DOCS_VIEW', 'ADMIN_DATA_VIEW', 'ADMIN_MATCH_VIEW', 'ADMIN_MONITOR_VIEW', 'ADMIN_AUDIT_VIEW']
-        : []
-    return {
-      token: `mock-token-${payload.userType.toLowerCase()}`,
-      userType: payload.userType,
-      userId: payload.account || 'demo',
-      permissions,
-    }
-  },
-}
-
 export const mockDocument = {
   async upload(payload: { fileName: string; fileType: 'DOC' | 'PDF'; docType: DocType }) {
     const id = genId('doc')
@@ -65,8 +49,20 @@ export const mockDocument = {
         skills: ['Java', 'Spring Boot', 'Vue 3', 'TypeScript', 'SQL'],
         education: [{ school: '某高校', degree: '本科', major: '计算机科学与技术' }],
         projects: [{ name: '能力图谱系统', summary: '解析简历并构建技能图谱，输出可解释匹配结果' }],
+        ...(payload.docType === 'RESUME'
+          ? {
+              resumeCritique: '【优势】\n- 工程基础扎实\n',
+              hollandRiasec: { R: 35, I: 48, A: 30, S: 52, E: 38, C: 44 },
+            }
+          : {
+              jobCritique: '摘要：示例岗位\n',
+              jobHollandRiasec: { R: 32, I: 50, A: 28, S: 40, E: 42, C: 46 },
+            }),
       },
       evidences: [{ field: 'skills', page: 1, text: '熟悉 Vue3/TS、Spring Boot、SQL...' }],
+      ...(payload.docType === 'RESUME'
+        ? { canPublishToTalentPool: true, talentPoolPublished: false }
+        : {}),
     }
     const tasks = readDocTasks()
     tasks[id] = { doc, startedAt: now, result }
@@ -95,7 +91,28 @@ export const mockDocument = {
     const task = tasks[docId]
     if (!task) throw new Error('任务不存在')
     await mockDocument.status(docId)
-    return task.result
+    const base = { ...task.result }
+    if (task.doc.docType === 'RESUME') {
+      base.canPublishToTalentPool = true
+      base.talentPoolPublished = base.talentPoolPublished ?? false
+    }
+    return base
+  },
+  async publishTalentPool(docId: string) {
+    const tasks = readDocTasks()
+    const task = tasks[docId]
+    if (!task) {
+      const err = new Error('任务不存在')
+      ;(err as any).code = 'NOT_FOUND'
+      throw err
+    }
+    if (task.doc.docType !== 'RESUME') {
+      throw new Error('仅简历可上传至人才库')
+    }
+    task.result = { ...task.result, talentPoolPublished: true }
+    tasks[docId] = task
+    writeDocTasks(tasks)
+    return { docId, talentPoolPublished: true }
   },
 }
 

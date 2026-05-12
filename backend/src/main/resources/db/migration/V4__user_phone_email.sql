@@ -1,0 +1,3 @@
+ALTER TABLE aimap_user
+  ADD COLUMN phone VARCHAR(32) NULL AFTER account,
+  ADD COLUMN email VARCHAR(255) NULL AFTER phone;

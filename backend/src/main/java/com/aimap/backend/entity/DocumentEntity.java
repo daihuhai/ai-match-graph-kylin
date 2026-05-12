@@ -37,6 +37,9 @@ public class DocumentEntity {
   @Column(name = "resume_holland_json", columnDefinition = "json")
   private String resumeHollandJson;
 
+  @Column(name = "resume_skills_json", columnDefinition = "json")
+  private String resumeSkillsJson;
+
   @Column(name = "job_holland_json", columnDefinition = "json")
   private String jobHollandJson;
 
@@ -116,6 +119,14 @@ public class DocumentEntity {
 
   public void setResumeHollandJson(String resumeHollandJson) {
     this.resumeHollandJson = resumeHollandJson;
+  }
+
+  public String getResumeSkillsJson() {
+    return resumeSkillsJson;
+  }
+
+  public void setResumeSkillsJson(String resumeSkillsJson) {
+    this.resumeSkillsJson = resumeSkillsJson;
   }
 
   public String getJobHollandJson() {

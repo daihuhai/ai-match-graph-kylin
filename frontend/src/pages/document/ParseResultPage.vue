@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getParseResult } from '@/api/document'
+import { getParseResult, publishResumeToTalentPool } from '@/api/document'
+import { jobMarketMatchesForDocument } from '@/api/match'
 import type { ParseResultVO } from '@/types/document'
+import type { MatchListItem } from '@/types/match'
 import { useDocumentStore } from '@/stores/document'
+import { useMatchStore } from '@/stores/match'
 
 const route = useRoute()
 const router = useRouter()
 const docsStore = useDocumentStore()
+const matchStore = useMatchStore()
 
 const docId = computed(() => String(route.params.docId || ''))
 const isCompany = computed(() => route.path.startsWith('/company'))
@@ -16,6 +20,10 @@ const base = computed(() => (isCompany.value ? '/company' : '/person'))
 
 const loading = ref(true)
 const data = ref<ParseResultVO | null>(null)
+
+const jobMatches = ref<MatchListItem[]>([])
+const jobMatchesLoading = ref(false)
+const publishLoading = ref(false)
 
 const parsed = computed(() => {
   const v = data.value?.resultJson
@@ -74,7 +82,47 @@ const hollandRows = computed(() => {
   })
 })
 
+const canPublishToTalentPool = computed(() => !!data.value?.canPublishToTalentPool)
+const talentPoolPublished = computed(() => !!data.value?.talentPoolPublished)
+
+const loadJobMatches = async () => {
+  if (isCompany.value || !docId.value) return
+  jobMatchesLoading.value = true
+  try {
+    jobMatches.value = await jobMarketMatchesForDocument(docId.value, 0)
+  } catch {
+    jobMatches.value = []
+  } finally {
+    jobMatchesLoading.value = false
+  }
+}
+
+const publishPool = async () => {
+  publishLoading.value = true
+  try {
+    await publishResumeToTalentPool(docId.value)
+    ElMessage.success('已上传至系统人才库，企业端可在「人才库推荐」中查看')
+    data.value = await getParseResult(docId.value)
+    if (data.value) {
+      docsStore.hydrate()
+      docsStore.setResult(docId.value, data.value)
+      docsStore.updateStatus(docId.value, data.value.status)
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加入人才库失败')
+  } finally {
+    publishLoading.value = false
+  }
+}
+
+const openJobMatchDetail = (row: MatchListItem) => {
+  matchStore.hydrate()
+  matchStore.addHistory(row, 'PERSON')
+  router.push(`/person/match/detail/${encodeURIComponent(row.recordId)}`)
+}
+
 onMounted(async () => {
+  matchStore.hydrate()
   loading.value = true
   try {
     data.value = await getParseResult(docId.value)
@@ -89,6 +137,14 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+watch(
+  () => [data.value?.status, docId.value, isCompany.value] as const,
+  ([st]) => {
+    if (!isCompany.value && st === 'DONE') void loadJobMatches()
+  },
+  { immediate: true },
+)
 
 const goGraph = () => {
   const subjectId = isCompany.value ? 'job-001' : 'person-001'
@@ -115,6 +171,48 @@ const goGraph = () => {
       <div v-if="loading" class="text-sm text-zinc-600">加载中...</div>
       <div v-else-if="!data" class="text-sm text-zinc-600">暂无数据</div>
       <div v-else class="space-y-4">
+        <el-card v-if="!isCompany && data?.status === 'DONE'" shadow="never">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="text-sm text-zinc-700">
+              <span v-if="talentPoolPublished">该简历已上传至系统人才库，企业端可在「人才库推荐」中查看。</span>
+              <span v-else-if="canPublishToTalentPool">解析已完成，可将本简历同步至系统人才库供企业筛选（自愿，不影响下方人才市场匹配）。</span>
+              <span v-else>
+                当前文档未绑定个人登录账号，无法写入人才库。请使用个人账号登录后重新上传简历，再点击上传人才库。
+              </span>
+            </div>
+            <el-button
+              v-if="canPublishToTalentPool && !talentPoolPublished"
+              type="primary"
+              :loading="publishLoading"
+              @click="publishPool"
+            >
+              上传人才库
+            </el-button>
+          </div>
+        </el-card>
+
+        <el-card v-if="!isCompany && data?.status === 'DONE'" shadow="never">
+          <div class="text-sm font-semibold text-zinc-800">人才市场 · 与本简历的匹配岗位</div>
+          <div class="mt-1 text-xs text-zinc-500">
+            基于本简历霍兰德画像与人才市场中全部岗位（含企业上传 JD）计算；此环节无需加入人才库。
+          </div>
+          <div v-if="jobMatchesLoading" class="mt-3 text-sm text-zinc-600">加载中...</div>
+          <el-table v-else class="mt-3" :data="jobMatches" size="small" max-height="360">
+            <el-table-column prop="title" label="岗位" min-width="200" />
+            <el-table-column prop="org" label="来源" min-width="160" />
+            <el-table-column prop="score" label="匹配度" width="100">
+              <template #default="{ row }">
+                <el-tag type="success">{{ row.score }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button type="primary" link @click="openJobMatchDetail(row)">查看</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
         <el-tabs>
           <el-tab-pane v-if="resumeCritique || jobCritique || hollandRiasec" label="AI 分析与霍兰德">
             <el-alert

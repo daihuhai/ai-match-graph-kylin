@@ -6,8 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "aimap_candidate_catalog")
-public class CandidateCatalogEntity {
+@Table(name = "aimap_job_market")
+public class JobMarketEntity {
 
   @Id
   @Column(name = "record_id", length = 32)
@@ -24,6 +24,18 @@ public class CandidateCatalogEntity {
 
   @Column(name = "skills_json", nullable = false, columnDefinition = "json")
   private String skillsJson;
+
+  @Column(name = "source", nullable = false, length = 16)
+  private String source = "SEED";
+
+  @Column(name = "document_id", length = 40)
+  private String documentId;
+
+  @Column(name = "owner_user_type", length = 16)
+  private String ownerUserType;
+
+  @Column(name = "owner_account", length = 128)
+  private String ownerAccount;
 
   public String getRecordId() {
     return recordId;
@@ -63,5 +75,37 @@ public class CandidateCatalogEntity {
 
   public void setSkillsJson(String skillsJson) {
     this.skillsJson = skillsJson;
+  }
+
+  public String getSource() {
+    return source;
+  }
+
+  public void setSource(String source) {
+    this.source = source;
+  }
+
+  public String getDocumentId() {
+    return documentId;
+  }
+
+  public void setDocumentId(String documentId) {
+    this.documentId = documentId;
+  }
+
+  public String getOwnerUserType() {
+    return ownerUserType;
+  }
+
+  public void setOwnerUserType(String ownerUserType) {
+    this.ownerUserType = ownerUserType;
+  }
+
+  public String getOwnerAccount() {
+    return ownerAccount;
+  }
+
+  public void setOwnerAccount(String ownerAccount) {
+    this.ownerAccount = ownerAccount;
   }
 }

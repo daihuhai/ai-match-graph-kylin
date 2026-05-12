@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -46,6 +47,15 @@ public class MatchController {
     return ApiResponse.ok(dataService.recommendCandidates(user, min));
   }
 
+  /** 根据简历文档的霍兰德画像，与「人才市场」中的岗位（含企业上传 JD）计算匹配度，无需加入人才库。 */
+  @GetMapping("/job-market/for-document/{docId}")
+  public ApiResponse<List<Map<String, Object>>> jobMarketForDocument(
+      @PathVariable("docId") String docId,
+      @RequestParam(name = "minScore", defaultValue = "0") int minScore) {
+    int min = Math.max(0, Math.min(100, minScore));
+    return ApiResponse.ok(dataService.recommendJobsForResumeDocument(docId, min));
+  }
+
   @GetMapping("/{id}/detail")
   public ApiResponse<Map<String, Object>> detail(
       @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -54,10 +64,10 @@ public class MatchController {
     if (recordId.startsWith("rec-job-") || recordId.startsWith("rec-cand-")) {
       return ApiResponse.ok(dataService.legacyMatchDetail(recordId));
     }
-    if (recordId.startsWith("job-")) {
+    if (recordId.startsWith("job-") || recordId.startsWith("jm-")) {
       return ApiResponse.ok(dataService.matchDetailForJob(recordId, user));
     }
-    if (recordId.startsWith("cand-")) {
+    if (recordId.startsWith("cand-") || recordId.startsWith("tp-")) {
       return ApiResponse.ok(dataService.matchDetailForCandidate(recordId, user));
     }
     throw new IllegalArgumentException("未知的匹配记录 ID");

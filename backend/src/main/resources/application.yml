@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
@@ -31,3 +31,9 @@ ark:
   api-key: ${ARK_API_KEY:}
   base-url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
   model: ${ARK_MODEL:doubao-seed-2-0-lite-260428}
+
+# 文档正文：Tika 抽取上限（防止超大文档撑爆内存）；送入大模型前再按 llm-body-max-chars 截断
+aimap:
+  document:
+    tika-write-limit: 500000
+    llm-body-max-chars: 80000

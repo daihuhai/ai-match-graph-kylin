@@ -10,7 +10,7 @@ const router = useRouter()
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="text-base font-semibold">企业工作台</div>
-          <div class="mt-1 text-sm text-zinc-600">上传 JD 后可查看职位图谱与候选人推荐。</div>
+          <div class="mt-1 text-sm text-zinc-600">上传 JD 后将自动进入人才市场，并可在人才库推荐中筛选候选人。</div>
         </div>
         <el-button type="primary" @click="router.push('/company/doc/list')">进入文档中心</el-button>
       </div>
@@ -22,8 +22,8 @@ const router = useRouter()
         <div class="mt-1 text-sm text-zinc-600">查看岗位技能要求网络与关联关系。</div>
       </el-card>
       <el-card shadow="never" class="cursor-pointer" @click="router.push('/company/match/candidates')">
-        <div class="text-sm font-semibold">候选人推荐</div>
-        <div class="mt-1 text-sm text-zinc-600">查看推荐列表、差距项与建议。</div>
+        <div class="text-sm font-semibold">人才库推荐</div>
+        <div class="mt-1 text-sm text-zinc-600">从系统人才库查看推荐列表、差距项与建议。</div>
       </el-card>
       <el-card shadow="never" class="cursor-pointer" @click="router.push('/company/doc/list')">
         <div class="text-sm font-semibold">文档中心</div>

@@ -1,6 +1,6 @@
 # Portable Maven under repo .tools/apache-maven-*: package then java -jar.
 # On some Windows paths with non-ASCII chars, mvn spring-boot:run may fail; jar launch is more reliable.
-# Loads ./.env.backend if present (ARK_API_KEY, DB_*, etc.).
+# Loads ./.env.backend then ./.env.backend.local (ARK_API_KEY, DB_*, etc.).
 $ErrorActionPreference = 'Stop'
 $backendDir = $PSScriptRoot
 . (Join-Path $backendDir 'import-backend-env.ps1')

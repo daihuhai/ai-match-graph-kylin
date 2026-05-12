@@ -16,7 +16,7 @@ const auth = useAuthStore()
 const audit = useAuditStore()
 
 const isCompany = computed(() => route.path.startsWith('/company'))
-const title = computed(() => (isCompany.value ? '候选人推荐' : '职位推荐'))
+const title = computed(() => (isCompany.value ? '人才库推荐' : '人才市场 · 职位推荐'))
 const list = ref<MatchListItem[]>([])
 const loading = ref(true)
 const tab = ref<'recommend' | 'favorite' | 'history'>('recommend')
@@ -101,7 +101,7 @@ const toggleFav = (recordId: string) => {
         <div>
           <div class="text-base font-semibold">{{ title }}</div>
           <div class="mt-1 text-sm text-zinc-600">
-            霍兰德 RIASEC 与职位库/人才库关联匹配；可设置最低匹配度筛选（后端过滤）。
+            霍兰德 RIASEC：企业端从系统人才库匹配候选人；个人端从人才市场（含企业发布的 JD）匹配岗位。可设置最低匹配度（后端过滤）。
           </div>
           <div class="mt-4 flex max-w-md flex-col gap-2">
             <div class="flex items-center justify-between text-xs text-zinc-600">

@@ -3,7 +3,9 @@ package com.aimap.backend.service;
 import com.aimap.backend.util.JsonObjectExtractor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -12,12 +14,16 @@ import org.springframework.stereotype.Component;
 public class DocumentLlmJsonParser {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  public record ParsedDoc(String critiqueMarkdown, Map<String, Integer> riasec) {}
+  public record ParsedDoc(String critiqueMarkdown, Map<String, Integer> riasec, List<String> skills) {
+    public ParsedDoc {
+      skills = skills == null ? List.of() : List.copyOf(skills);
+    }
+  }
 
   public ParsedDoc parse(String rawLlmText, boolean resume) {
     Optional<String> json = JsonObjectExtractor.firstBalancedObject(rawLlmText == null ? "" : rawLlmText);
     if (json.isEmpty()) {
-      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec());
+      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec(), List.of());
     }
     try {
       JsonNode root = MAPPER.readTree(json.get());
@@ -29,10 +35,27 @@ public class DocumentLlmJsonParser {
       if (critique.isBlank()) {
         critique = rawLlmText.trim();
       }
-      return new ParsedDoc(critique, riasec);
+      List<String> skills = resume ? readTextSkills(root.path("skills")) : readTextSkills(root.path("critique").path("requiredSkills"));
+      return new ParsedDoc(critique, riasec, skills);
     } catch (Exception e) {
-      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec());
+      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec(), List.of());
     }
+  }
+
+  private static List<String> readTextSkills(JsonNode node) {
+    List<String> out = new ArrayList<>();
+    if (node == null || !node.isArray() || node.isEmpty()) {
+      return out;
+    }
+    for (JsonNode n : node) {
+      if (n.isTextual()) {
+        String t = n.asText().trim();
+        if (!t.isEmpty() && out.size() < 24) {
+          out.add(t);
+        }
+      }
+    }
+    return out;
   }
 
   private static Map<String, Integer> defaultRiasec() {
