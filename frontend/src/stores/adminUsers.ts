@@ -1,79 +1,66 @@
 import { defineStore } from 'pinia'
-import { getDataStorage } from '@/utils/storage'
+import {
+  createAdminUser,
+  deleteAdminUser,
+  listAdminUsers,
+  resetAdminUserPassword,
+  updateAdminUser,
+  updateAdminUserStatus,
+  type AdminUserRow,
+  type AdminUserStatus,
+  type AdminUserType,
+} from '@/api/adminUsers'
 
-export type AdminUserType = 'PERSON' | 'COMPANY' | 'ADMIN'
-export type AdminUserStatus = 'ACTIVE' | 'DISABLED'
-
-export interface AdminUserRow {
-  id: string
-  account: string
-  userType: AdminUserType
-  status: AdminUserStatus
-  createdAt: string
-  lastLoginAt?: string
-}
+export type { AdminUserRow, AdminUserStatus, AdminUserType }
 
 export interface AdminUsersState {
   users: AdminUserRow[]
+  loading: boolean
 }
-
-const STORAGE_KEY = 'aimap.admin.users'
 
 export const useAdminUsersStore = defineStore('adminUsers', {
   state: (): AdminUsersState => ({
     users: [],
+    loading: false,
   }),
   actions: {
-    hydrate() {
-      const storage = getDataStorage()
-      const raw = storage.getItem(STORAGE_KEY)
-      if (!raw) {
-        const now = new Date().toISOString()
-        this.users = [
-          { id: 'u-001', account: 'demo', userType: 'PERSON', status: 'ACTIVE', createdAt: now, lastLoginAt: now },
-          { id: 'u-002', account: 'hr-demo', userType: 'COMPANY', status: 'ACTIVE', createdAt: now, lastLoginAt: now },
-          { id: 'u-003', account: 'admin', userType: 'ADMIN', status: 'ACTIVE', createdAt: now, lastLoginAt: now },
-        ]
-        this.persist()
-        return
-      }
+    async fetchUsers() {
+      this.loading = true
       try {
-        const data = JSON.parse(raw) as Partial<AdminUsersState>
-        this.users = Array.isArray(data.users) ? (data.users as AdminUserRow[]) : []
-      } catch {
-        storage.removeItem(STORAGE_KEY)
+        this.users = await listAdminUsers()
+      } finally {
+        this.loading = false
       }
     },
-    persist() {
-      getDataStorage().setItem(STORAGE_KEY, JSON.stringify({ users: this.users }))
-    },
-    upsert(user: Omit<AdminUserRow, 'id' | 'createdAt'> & Partial<Pick<AdminUserRow, 'id' | 'createdAt'>>) {
-      const id = user.id || `u-${Date.now()}`
-      const createdAt = user.createdAt || new Date().toISOString()
-      const row: AdminUserRow = {
-        id,
-        account: user.account,
-        userType: user.userType,
-        status: user.status,
-        createdAt,
-        lastLoginAt: user.lastLoginAt,
-      }
-      const idx = this.users.findIndex((u) => u.id === id)
+    async upsert(user: {
+      id?: number
+      account: string
+      userType: AdminUserType
+      status: AdminUserStatus
+      phone?: string
+      email?: string
+    }) {
+      const row = user.id
+        ? await updateAdminUser(user.id, user)
+        : await createAdminUser(user)
+      const idx = this.users.findIndex((u) => u.id === row.id)
       if (idx >= 0) this.users.splice(idx, 1, row)
-      else this.users.unshift(row)
-      this.persist()
+      else this.users.push(row)
+      this.users.sort((a, b) => a.id - b.id)
       return row
     },
-    setStatus(id: string, status: AdminUserStatus) {
-      const u = this.users.find((x) => x.id === id)
-      if (!u) return
-      u.status = status
-      this.persist()
+    async setStatus(id: number, status: AdminUserStatus) {
+      const row = await updateAdminUserStatus(id, status)
+      const idx = this.users.findIndex((u) => u.id === id)
+      if (idx >= 0) this.users.splice(idx, 1, row)
+      return row
     },
-    remove(id: string) {
+    async remove(id: number) {
+      await deleteAdminUser(id)
       this.users = this.users.filter((x) => x.id !== id)
-      this.persist()
+    },
+    async resetPassword(id: number) {
+      return resetAdminUserPassword(id)
     },
   },
 })
-

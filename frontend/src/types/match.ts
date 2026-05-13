@@ -2,6 +2,7 @@ export interface MatchListItem {
   recordId: string
   title: string
   org: string
+  companyAccount?: string
   score: number
 }
 
@@ -45,6 +46,13 @@ export interface RiasecMatch {
 
 export interface MatchDetailVO {
   recordId: string
+  candidateDocumentId?: string
+  candidateAccount?: string
+  candidateTitle?: string
+  candidateOrg?: string
+  jobCompanyAccount?: string
+  jobTitle?: string
+  jobOrg?: string
   score: number
   scoreBreakdown: Record<string, number>
   matchedSkills: Array<{ name: string; requiredLevel: number; personLevel: number }>

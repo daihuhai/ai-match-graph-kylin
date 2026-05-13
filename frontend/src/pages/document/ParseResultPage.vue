@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getParseResult, publishResumeToTalentPool } from '@/api/document'
+import { getParseResult, listCompanyTargets, publishResumeToTalentPool } from '@/api/document'
 import { jobMarketMatchesForDocument } from '@/api/match'
 import type { ParseResultVO } from '@/types/document'
 import type { MatchListItem } from '@/types/match'
@@ -20,70 +20,42 @@ const base = computed(() => (isCompany.value ? '/company' : '/person'))
 
 const loading = ref(true)
 const data = ref<ParseResultVO | null>(null)
-
 const jobMatches = ref<MatchListItem[]>([])
 const jobMatchesLoading = ref(false)
 const publishLoading = ref(false)
+const companyTargets = ref<Array<{ account: string }>>([])
+const selectedCompanyAccount = ref('')
 
 const parsed = computed(() => {
   const v = data.value?.resultJson
-  if (!v || typeof v !== 'object') return null
-  return v as any
+  return v && typeof v === 'object' ? (v as any) : null
 })
 
-const skills = computed<string[]>(() => {
-  const s = parsed.value?.skills
-  return Array.isArray(s) ? s.filter((x: any) => typeof x === 'string') : []
-})
-
-const educations = computed<Array<{ school?: string; degree?: string; major?: string }>>(() => {
-  const e = parsed.value?.education
-  return Array.isArray(e) ? e : []
-})
-
-const projects = computed<Array<{ name?: string; summary?: string }>>(() => {
-  const p = parsed.value?.projects
-  return Array.isArray(p) ? p : []
-})
-
-const resumeCritique = computed(() => {
-  const t = parsed.value?.resumeCritique
-  return typeof t === 'string' ? t : ''
-})
-
-const jobCritique = computed(() => {
-  const t = parsed.value?.jobCritique
-  return typeof t === 'string' ? t : ''
-})
-
-const hollandRiasec = computed(() => {
-  const h = parsed.value?.hollandRiasec ?? parsed.value?.jobHollandRiasec
-  if (!h || typeof h !== 'object') return null
-  return h as Record<string, number>
-})
+const skills = computed<string[]>(() => (Array.isArray(parsed.value?.skills) ? parsed.value.skills.filter((x: unknown) => typeof x === 'string') : []))
+const educations = computed<Array<{ school?: string; degree?: string; major?: string }>>(() => (Array.isArray(parsed.value?.education) ? parsed.value.education : []))
+const projects = computed<Array<{ name?: string; summary?: string }>>(() => (Array.isArray(parsed.value?.projects) ? parsed.value.projects : []))
+const resumeCritique = computed(() => (typeof parsed.value?.resumeCritique === 'string' ? parsed.value.resumeCritique : ''))
+const jobCritique = computed(() => (typeof parsed.value?.jobCritique === 'string' ? parsed.value.jobCritique : ''))
+const canDeliver = computed(() => !!data.value?.canPublishToTalentPool)
+const deliveredCompanyAccounts = computed(() => data.value?.deliveredCompanyAccounts ?? [])
 
 const hollandRows = computed(() => {
-  const h = hollandRiasec.value
-  if (!h) return []
-  const keys = ['R', 'I', 'A', 'S', 'E', 'C'] as const
-  const name: Record<string, string> = {
-    R: '现实型',
-    I: '研究型',
-    A: '艺术型',
-    S: '社会型',
-    E: '企业型',
-    C: '常规型',
-  }
-  return keys.map((k) => {
-    const low = k.toLowerCase()
-    const raw = (h as Record<string, unknown>)[k] ?? (h as Record<string, unknown>)[low]
-    const v = typeof raw === 'number' ? raw : Number(raw)
-    return { code: k, label: name[k] ?? k, value: Number.isFinite(v) ? v : 0 }
+  const raw = parsed.value?.hollandRiasec ?? parsed.value?.jobHollandRiasec
+  if (!raw || typeof raw !== 'object') return []
+  const names: Record<string, string> = { R: '现实型', I: '研究型', A: '艺术型', S: '社会型', E: '企业型', C: '常规型' }
+  return (['R', 'I', 'A', 'S', 'E', 'C'] as const).map((key) => {
+    const value = (raw[key] ?? raw[key.toLowerCase()]) as number | string | undefined
+    const num = typeof value === 'number' ? value : Number(value)
+    return { code: key, label: names[key], value: Number.isFinite(num) ? num : 0 }
   })
 })
 
-const canPublishToTalentPool = computed(() => !!data.value?.canPublishToTalentPool)
-const talentPoolPublished = computed(() => !!data.value?.talentPoolPublished)
+const refreshResult = async () => {
+  data.value = await getParseResult(docId.value)
+  docsStore.hydrate()
+  docsStore.setResult(docId.value, data.value)
+  docsStore.updateStatus(docId.value, data.value.status)
+}
 
 const loadJobMatches = async () => {
   if (isCompany.value || !docId.value) return
@@ -97,19 +69,18 @@ const loadJobMatches = async () => {
   }
 }
 
-const publishPool = async () => {
+const deliverResume = async () => {
+  if (!selectedCompanyAccount.value) {
+    ElMessage.warning('请先选择企业')
+    return
+  }
   publishLoading.value = true
   try {
-    await publishResumeToTalentPool(docId.value)
-    ElMessage.success('已上传至系统人才库，企业端可在「人才库推荐」中查看')
-    data.value = await getParseResult(docId.value)
-    if (data.value) {
-      docsStore.hydrate()
-      docsStore.setResult(docId.value, data.value)
-      docsStore.updateStatus(docId.value, data.value.status)
-    }
+    await publishResumeToTalentPool(docId.value, selectedCompanyAccount.value)
+    await refreshResult()
+    ElMessage.success(`已投递到 ${selectedCompanyAccount.value}`)
   } catch (e: any) {
-    ElMessage.error(e?.message || '加入人才库失败')
+    ElMessage.error(e?.message || '投递失败')
   } finally {
     publishLoading.value = false
   }
@@ -125,12 +96,11 @@ onMounted(async () => {
   matchStore.hydrate()
   loading.value = true
   try {
-    data.value = await getParseResult(docId.value)
-    if (data.value) {
-      docsStore.hydrate()
-      docsStore.setResult(docId.value, data.value)
-      docsStore.updateStatus(docId.value, data.value.status)
+    if (!isCompany.value) {
+      companyTargets.value = await listCompanyTargets()
+      selectedCompanyAccount.value = companyTargets.value[0]?.account ?? ''
     }
+    await refreshResult()
   } catch (e: any) {
     ElMessage.error(e?.message || '获取解析结果失败')
   } finally {
@@ -140,15 +110,14 @@ onMounted(async () => {
 
 watch(
   () => [data.value?.status, docId.value, isCompany.value] as const,
-  ([st]) => {
-    if (!isCompany.value && st === 'DONE') void loadJobMatches()
+  ([status]) => {
+    if (!isCompany.value && status === 'DONE') void loadJobMatches()
   },
   { immediate: true },
 )
 
 const goGraph = () => {
-  const subjectId = isCompany.value ? 'job-001' : 'person-001'
-  router.push(`${base.value}/graph/${subjectId}`)
+  router.push(`${base.value}/graph/${isCompany.value ? 'job-001' : 'person-001'}`)
 }
 </script>
 
@@ -171,31 +140,24 @@ const goGraph = () => {
       <div v-if="loading" class="text-sm text-zinc-600">加载中...</div>
       <div v-else-if="!data" class="text-sm text-zinc-600">暂无数据</div>
       <div v-else class="space-y-4">
-        <el-card v-if="!isCompany && data?.status === 'DONE'" shadow="never">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="text-sm text-zinc-700">
-              <span v-if="talentPoolPublished">该简历已上传至系统人才库，企业端可在「人才库推荐」中查看。</span>
-              <span v-else-if="canPublishToTalentPool">解析已完成，可将本简历同步至系统人才库供企业筛选（自愿，不影响下方人才市场匹配）。</span>
-              <span v-else>
-                当前文档未绑定个人登录账号，无法写入人才库。请使用个人账号登录后重新上传简历，再点击上传人才库。
-              </span>
+        <el-card v-if="!isCompany && data.status === 'DONE'" shadow="never">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex-1 text-sm text-zinc-700">
+              只有你主动选择企业投递后，简历才会进入该企业的人才库。每家企业只能看到投给自己的简历。
             </div>
-            <el-button
-              v-if="canPublishToTalentPool && !talentPoolPublished"
-              type="primary"
-              :loading="publishLoading"
-              @click="publishPool"
-            >
-              上传人才库
-            </el-button>
+            <el-select v-if="canDeliver" v-model="selectedCompanyAccount" placeholder="选择企业" style="width: 220px">
+              <el-option v-for="company in companyTargets" :key="company.account" :label="company.account" :value="company.account" />
+            </el-select>
+            <el-button v-if="canDeliver" type="primary" :loading="publishLoading" @click="deliverResume">投递简历</el-button>
+          </div>
+          <div v-if="deliveredCompanyAccounts.length" class="mt-3 flex flex-wrap gap-2">
+            <el-tag v-for="account in deliveredCompanyAccounts" :key="account" type="success">{{ account }}</el-tag>
           </div>
         </el-card>
 
-        <el-card v-if="!isCompany && data?.status === 'DONE'" shadow="never">
-          <div class="text-sm font-semibold text-zinc-800">人才市场 · 与本简历的匹配岗位</div>
-          <div class="mt-1 text-xs text-zinc-500">
-            基于本简历霍兰德画像与人才市场中全部岗位（含企业上传 JD）计算；此环节无需加入人才库。
-          </div>
+        <el-card v-if="!isCompany && data.status === 'DONE'" shadow="never">
+          <div class="text-sm font-semibold text-zinc-800">人才市场岗位匹配</div>
+          <div class="mt-1 text-xs text-zinc-500">这里是简历对人才市场岗位的匹配，不依赖企业投递。</div>
           <div v-if="jobMatchesLoading" class="mt-3 text-sm text-zinc-600">加载中...</div>
           <el-table v-else class="mt-3" :data="jobMatches" size="small" max-height="360">
             <el-table-column prop="title" label="岗位" min-width="200" />
@@ -214,25 +176,17 @@ const goGraph = () => {
         </el-card>
 
         <el-tabs>
-          <el-tab-pane v-if="resumeCritique || jobCritique || hollandRiasec" label="AI 分析与霍兰德">
-            <el-alert
-              type="info"
-              :closable="false"
-              show-icon
-              class="mb-4"
-              title="说明"
-              description="当前后端在未解析 PDF/Word 正文时，会结合文件名与大小调用大模型生成指导性分析与 RIASEC 估计；上传真实解析文本后可进一步提高准确度。"
-            />
+          <el-tab-pane v-if="resumeCritique || jobCritique || hollandRows.length" label="AI 分析">
             <el-card v-if="resumeCritique" shadow="never" class="mb-4">
-              <div class="text-sm font-semibold text-zinc-700">简历优劣与改进建议</div>
+              <div class="text-sm font-semibold text-zinc-700">简历分析</div>
               <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-zinc-50 p-4 text-sm text-zinc-800">{{ resumeCritique }}</pre>
             </el-card>
             <el-card v-if="jobCritique" shadow="never" class="mb-4">
-              <div class="text-sm font-semibold text-zinc-700">岗位需求智能解读</div>
+              <div class="text-sm font-semibold text-zinc-700">岗位分析</div>
               <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-zinc-50 p-4 text-sm text-zinc-800">{{ jobCritique }}</pre>
             </el-card>
             <el-card v-if="hollandRows.length" shadow="never">
-              <div class="text-sm font-semibold text-zinc-700">霍兰德 RIASEC（0–100）</div>
+              <div class="text-sm font-semibold text-zinc-700">霍兰德 RIASEC</div>
               <el-table class="mt-3" :data="hollandRows" size="small" border>
                 <el-table-column prop="code" label="维度" width="90" />
                 <el-table-column prop="label" label="类型" width="120" />
@@ -240,7 +194,8 @@ const goGraph = () => {
               </el-table>
             </el-card>
           </el-tab-pane>
-          <el-tab-pane label="结构化字段">
+
+          <el-tab-pane label="结构化结果">
             <el-descriptions :column="1" border>
               <el-descriptions-item label="状态">{{ data.status }}</el-descriptions-item>
             </el-descriptions>
@@ -278,12 +233,10 @@ const goGraph = () => {
 
             <div class="mt-4">
               <el-collapse>
-                <el-collapse-item title="解析结果（JSON）" name="json">
-                  <pre class="max-h-[420px] overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-100">{{
-                    JSON.stringify(data.resultJson, null, 2)
-                  }}</pre>
+                <el-collapse-item title="解析结果 JSON" name="json">
+                  <pre class="max-h-[420px] overflow-auto rounded-lg bg-zinc-950 p-4 text-xs text-zinc-100">{{ JSON.stringify(data.resultJson, null, 2) }}</pre>
                 </el-collapse-item>
-                <el-collapse-item title="证据（如有）" name="evidence">
+                <el-collapse-item title="证据" name="evidence">
                   <el-table :data="data.evidences || []" size="small">
                     <el-table-column prop="field" label="字段" width="160" />
                     <el-table-column prop="page" label="页码" width="90" />

@@ -37,6 +37,12 @@ public class TalentPoolEntity {
   @Column(name = "owner_account", length = 128)
   private String ownerAccount;
 
+  @Column(name = "target_company_user_type", length = 16)
+  private String targetCompanyUserType;
+
+  @Column(name = "target_company_account", length = 128)
+  private String targetCompanyAccount;
+
   @Column(name = "in_pool", nullable = false)
   private boolean inPool = true;
 
@@ -118,5 +124,21 @@ public class TalentPoolEntity {
 
   public void setInPool(boolean inPool) {
     this.inPool = inPool;
+  }
+
+  public String getTargetCompanyUserType() {
+    return targetCompanyUserType;
+  }
+
+  public void setTargetCompanyUserType(String targetCompanyUserType) {
+    this.targetCompanyUserType = targetCompanyUserType;
+  }
+
+  public String getTargetCompanyAccount() {
+    return targetCompanyAccount;
+  }
+
+  public void setTargetCompanyAccount(String targetCompanyAccount) {
+    this.targetCompanyAccount = targetCompanyAccount;
   }
 }

@@ -6,14 +6,21 @@ import com.aimap.backend.common.ApiResponse;
 import com.aimap.backend.service.ArkLlmService;
 import com.aimap.backend.service.DocumentLlmJsonParser;
 import com.aimap.backend.service.DocumentLlmJsonParser.ParsedDoc;
+import com.aimap.backend.service.DocumentOriginalStorageService;
 import com.aimap.backend.service.DocumentTextExtractor;
 import com.aimap.backend.service.InMemoryDataService;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,8 +39,9 @@ public class DocumentController {
   private final ArkLlmService arkLlmService;
   private final DocumentLlmJsonParser docParser;
   private final DocumentTextExtractor textExtractor;
+  private final DocumentOriginalStorageService originalStorageService;
 
-  public record TalentPoolPublishBody(Boolean publish) {
+  public record TalentPoolPublishBody(Boolean publish, String companyAccount) {
     boolean wantsPublish() {
       return publish == null || Boolean.TRUE.equals(publish);
     }
@@ -43,11 +51,13 @@ public class DocumentController {
       InMemoryDataService dataService,
       ArkLlmService arkLlmService,
       DocumentLlmJsonParser docParser,
-      DocumentTextExtractor textExtractor) {
+      DocumentTextExtractor textExtractor,
+      DocumentOriginalStorageService originalStorageService) {
     this.dataService = dataService;
     this.arkLlmService = arkLlmService;
     this.docParser = docParser;
     this.textExtractor = textExtractor;
+    this.originalStorageService = originalStorageService;
   }
 
   @PostMapping("/upload")
@@ -55,7 +65,8 @@ public class DocumentController {
       @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
       @RequestParam("file") MultipartFile file,
       @RequestParam("docType") String docType,
-      @RequestParam(value = "publishToTalentPool", defaultValue = "false") boolean publishToTalentPool) {
+      @RequestParam(value = "publishToTalentPool", defaultValue = "false") boolean publishToTalentPool,
+      @RequestParam(value = "companyAccount", required = false) String companyAccount) {
     String name = file.getOriginalFilename();
     if (!StringUtils.hasText(name)) {
       throw new IllegalArgumentException("文件名不能为空");
@@ -95,6 +106,7 @@ public class DocumentController {
             jobHolland,
             resumeSkillPayload,
             user);
+    originalStorageService.save(docId, name, file);
 
     user.filter(u -> "JOB_DESC".equals(docType) && "COMPANY".equals(u.userType()))
         .ifPresent(u -> dataService.upsertJobFromCompanyDocument(docId, name, jobHolland, parsed.skills(), u));
@@ -108,7 +120,7 @@ public class DocumentController {
       if (!"PERSON".equals(u.userType())) {
         throw new IllegalArgumentException("仅个人端可将简历加入人才库");
       }
-      dataService.publishResumeToTalentPool(docId, u);
+      dataService.publishResumeToTalentPool(docId, u, companyAccount);
     }
 
     return ApiResponse.ok(Map.of("docId", docId));
@@ -122,12 +134,28 @@ public class DocumentController {
     LoggedUser u =
         BearerUserResolver.fromAuthorization(authorization)
             .orElseThrow(() -> new IllegalArgumentException("需登录后方可操作人才库"));
-    TalentPoolPublishBody b = body == null ? new TalentPoolPublishBody(true) : body;
-    if (!b.wantsPublish()) {
+    TalentPoolPublishBody b = body == null ? new TalentPoolPublishBody(true, null) : body;
+    if (false && !b.wantsPublish()) {
       throw new IllegalArgumentException("当前仅支持加入人才库（publish=true）");
     }
-    dataService.publishResumeToTalentPool(docId, u);
-    return ApiResponse.ok(Map.of("docId", docId, "talentPoolPublished", true));
+    if (b.wantsPublish()) {
+      dataService.publishResumeToTalentPool(docId, u, b.companyAccount());
+    } else {
+      dataService.unpublishResumeFromTalentPool(docId, u, b.companyAccount());
+    }
+    Map<String, Object> out = new LinkedHashMap<>();
+    out.put("docId", docId);
+    out.put("talentPoolPublished", b.wantsPublish());
+    out.put("companyAccount", b.companyAccount());
+    return ApiResponse.ok(out);
+  }
+
+  @GetMapping("/company-targets")
+  public ApiResponse<List<Map<String, String>>> companyTargets() {
+    return ApiResponse.ok(
+        dataService.listActiveCompanyTargets().stream()
+            .map(c -> Map.of("account", c.account()))
+            .toList());
   }
 
   private static String resumePrompt(String fileName, long size, String bodyForLlm) {
@@ -221,8 +249,11 @@ public class DocumentController {
   }
 
   @GetMapping("/{id}/result")
-  public ApiResponse<Map<String, Object>> result(@PathVariable("id") String docId) {
+  public ApiResponse<Map<String, Object>> result(
+      @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+      @PathVariable("id") String docId) {
     InMemoryDataService.DocumentTask task = dataService.getDocTask(docId);
+    Optional<LoggedUser> user = BearerUserResolver.fromAuthorization(authorization);
     String status = InMemoryDataService.statusByElapsed(Instant.now().toEpochMilli() - task.startedAt());
     Map<String, Object> resultJson = new LinkedHashMap<>();
     List<String> demoSkills = List.of("Java", "Spring Boot", "Vue 3", "TypeScript", "SQL");
@@ -248,8 +279,11 @@ public class DocumentController {
 
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("docId", task.id());
+    out.put("fileName", task.fileName());
+    out.put("fileType", task.fileType());
     out.put("status", status);
     out.put("resultJson", resultJson);
+    out.put("originalAvailable", originalStorageService.exists(task.id(), task.fileName()));
     out.put(
         "evidences",
         List.of(
@@ -261,11 +295,51 @@ public class DocumentController {
                 "text",
                 "使用 Apache Tika 从上传文件中抽取纯文本后送入大模型；超长正文会截断。纯扫描 PDF（无文字层）或加密文件可能无法抽取正文。")));
     if ("RESUME".equals(task.docType())) {
-      boolean canPublish =
-          "PERSON".equals(task.ownerUserType()) && StringUtils.hasText(task.ownerAccount());
+      boolean canPublish = "PERSON".equals(task.ownerUserType()) && StringUtils.hasText(task.ownerAccount());
       out.put("canPublishToTalentPool", canPublish);
-      out.put("talentPoolPublished", dataService.isResumeInTalentPool(docId));
+      out.put(
+          "deliveredCompanyAccounts",
+          user.filter(u -> "PERSON".equals(u.userType()) && u.account().equals(task.ownerAccount()))
+              .map(u -> dataService.deliveredCompanyAccounts(docId, u))
+              .orElse(List.of()));
     }
     return ApiResponse.ok(out);
+  }
+
+  @GetMapping("/{id}/original")
+  public ResponseEntity<Resource> original(
+      @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+      @PathVariable("id") String docId) {
+    InMemoryDataService.DocumentTask task = dataService.getDocTask(docId);
+    LoggedUser user =
+        BearerUserResolver.fromAuthorization(authorization)
+            .orElseThrow(() -> new IllegalArgumentException("请先登录后再查看原始文档"));
+    assertCanReadOriginal(task, user);
+    Resource resource = originalStorageService.loadAsResource(task.id(), task.fileName());
+    MediaType mediaType =
+        MediaTypeFactory.getMediaType(task.fileName()).orElse(MediaType.APPLICATION_OCTET_STREAM);
+    return ResponseEntity.ok()
+        .contentType(mediaType)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.inline().filename(task.fileName(), StandardCharsets.UTF_8).build().toString())
+        .body(resource);
+  }
+
+  private void assertCanReadOriginal(InMemoryDataService.DocumentTask task, LoggedUser user) {
+    if ("ADMIN".equals(user.userType())) {
+      return;
+    }
+    boolean ownerMatch =
+        user.userType().equals(task.ownerUserType()) && user.account().equals(task.ownerAccount());
+    if (ownerMatch) {
+      return;
+    }
+    if ("COMPANY".equals(user.userType())
+        && "RESUME".equals(task.docType())
+        && dataService.isResumeDeliveredToCompany(task.id(), user.account())) {
+      return;
+    }
+    throw new IllegalArgumentException("当前账号无权查看该原始文档");
   }
 }

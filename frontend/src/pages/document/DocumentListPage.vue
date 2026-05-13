@@ -42,7 +42,7 @@ const goResult = (docId: string) => router.push(`${base.value}/doc/result/${enco
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="text-base font-semibold">{{ title }}</div>
-          <div class="mt-1 text-sm text-zinc-600">包含上传记录、解析任务与结果入口（本地 sessionStorage 持久化）。</div>
+          <div class="mt-1 text-sm text-zinc-600">包含上传记录、解析任务与结果入口。</div>
         </div>
         <el-button type="primary" @click="goUpload">新增上传</el-button>
       </div>

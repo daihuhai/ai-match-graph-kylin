@@ -37,3 +37,4 @@ aimap:
   document:
     tika-write-limit: 500000
     llm-body-max-chars: 80000
+    storage-root: ${DOCUMENT_STORAGE_ROOT:./data/document-originals}

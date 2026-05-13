@@ -61,7 +61,7 @@ export const mockDocument = {
       },
       evidences: [{ field: 'skills', page: 1, text: '熟悉 Vue3/TS、Spring Boot、SQL...' }],
       ...(payload.docType === 'RESUME'
-        ? { canPublishToTalentPool: true, talentPoolPublished: false }
+        ? { canPublishToTalentPool: true, deliveredCompanyAccounts: [] }
         : {}),
     }
     const tasks = readDocTasks()
@@ -94,11 +94,11 @@ export const mockDocument = {
     const base = { ...task.result }
     if (task.doc.docType === 'RESUME') {
       base.canPublishToTalentPool = true
-      base.talentPoolPublished = base.talentPoolPublished ?? false
+      base.deliveredCompanyAccounts = base.deliveredCompanyAccounts ?? []
     }
     return base
   },
-  async publishTalentPool(docId: string) {
+  async publishTalentPool(docId: string, publish = true, companyAccount = 'demo-company') {
     const tasks = readDocTasks()
     const task = tasks[docId]
     if (!task) {
@@ -109,10 +109,16 @@ export const mockDocument = {
     if (task.doc.docType !== 'RESUME') {
       throw new Error('仅简历可上传至人才库')
     }
-    task.result = { ...task.result, talentPoolPublished: true }
+    const delivered = new Set(task.result.deliveredCompanyAccounts ?? [])
+    if (publish) delivered.add(companyAccount)
+    else delivered.delete(companyAccount)
+    task.result = {
+      ...task.result,
+      deliveredCompanyAccounts: [...delivered],
+    }
     tasks[docId] = task
     writeDocTasks(tasks)
-    return { docId, talentPoolPublished: true }
+    return { docId, talentPoolPublished: publish }
   },
 }
 
@@ -197,8 +203,8 @@ export const mockGraph = {
 export const mockMatch = {
   async recommendJobs(minScore = 0): Promise<MatchListItem[]> {
     const rows: MatchListItem[] = [
-      { recordId: 'rec-job-001', title: '前端开发（Vue3）', org: '某科技公司', score: 86 },
-      { recordId: 'rec-job-002', title: '全栈开发（Java+Vue）', org: '某平台团队', score: 79 },
+      { recordId: 'rec-job-001', title: '前端开发（Vue3）', org: '某科技公司', companyAccount: 'demo-company', score: 86 },
+      { recordId: 'rec-job-002', title: '全栈开发（Java+Vue）', org: '某平台团队', companyAccount: 'demo-company-2', score: 79 },
     ]
     return rows.filter((r) => r.score >= minScore)
   },

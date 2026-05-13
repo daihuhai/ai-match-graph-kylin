@@ -53,6 +53,15 @@ export const useDocumentStore = defineStore('document', {
       this.results[docId] = result
       this.persist()
     },
+    setDeliveredCompanyAccounts(docId: string, companyAccounts: string[]) {
+      const current = this.results[docId]
+      if (!current) return
+      this.results[docId] = {
+        ...current,
+        deliveredCompanyAccounts: [...companyAccounts],
+      }
+      this.persist()
+    },
     clearResult(docId: string) {
       if (docId in this.results) {
         delete this.results[docId]

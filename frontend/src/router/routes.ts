@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
+
 const AuthLayout = () => import('@/layouts/AuthLayout.vue')
 const MainLayout = () => import('@/layouts/MainLayout.vue')
 const AdminLayout = () => import('@/layouts/AdminLayout.vue')
@@ -13,6 +14,7 @@ const ParseResultPage = () => import('@/pages/document/ParseResultPage.vue')
 const GraphPage = () => import('@/pages/graph/GraphPage.vue')
 const MatchListPage = () => import('@/pages/match/MatchListPage.vue')
 const MatchDetailPage = () => import('@/pages/match/MatchDetailPage.vue')
+const ChatCenterPage = () => import('@/pages/chat/ChatCenterPage.vue')
 const AdminHomePage = () => import('@/pages/admin/AdminHomePage.vue')
 const AdminUsersPage = () => import('@/pages/admin/AdminUsersPage.vue')
 const AdminDocumentsPage = () => import('@/pages/admin/AdminDocumentsPage.vue')
@@ -65,6 +67,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'graph/:subjectId', name: 'PersonGraph', component: GraphPage, meta: { userTypes: ['PERSON'], title: '能力图谱' } },
       { path: 'match/jobs', name: 'PersonMatchList', component: MatchListPage, meta: { userTypes: ['PERSON'], title: '人才市场' } },
       { path: 'match/detail/:recordId', name: 'PersonMatchDetail', component: MatchDetailPage, meta: { userTypes: ['PERSON'], title: '匹配详情' } },
+      { path: 'messages', name: 'PersonMessages', component: ChatCenterPage, meta: { userTypes: ['PERSON'], title: '消息中心' } },
     ],
   },
   {
@@ -77,9 +80,10 @@ export const routes: RouteRecordRaw[] = [
       { path: 'doc/upload', name: 'CompanyDocUpload', component: DocumentUploadPage, meta: { userTypes: ['COMPANY'], title: 'JD 上传' } },
       { path: 'doc/task/:docId', name: 'CompanyParseTask', component: ParseTaskPage, meta: { userTypes: ['COMPANY'], title: '解析任务' } },
       { path: 'doc/result/:docId', name: 'CompanyParseResult', component: ParseResultPage, meta: { userTypes: ['COMPANY'], title: '解析结果' } },
-      { path: 'graph/:subjectId', name: 'CompanyGraph', component: GraphPage, meta: { userTypes: ['COMPANY'], title: '能力图谱' } },
+      { path: 'graph/:subjectId', name: 'CompanyGraph', component: GraphPage, meta: { userTypes: ['COMPANY'], title: '职位图谱' } },
       { path: 'match/candidates', name: 'CompanyMatchList', component: MatchListPage, meta: { userTypes: ['COMPANY'], title: '人才库推荐' } },
       { path: 'match/detail/:recordId', name: 'CompanyMatchDetail', component: MatchDetailPage, meta: { userTypes: ['COMPANY'], title: '匹配详情' } },
+      { path: 'messages', name: 'CompanyMessages', component: ChatCenterPage, meta: { userTypes: ['COMPANY'], title: '消息中心' } },
     ],
   },
   {
