@@ -11,7 +11,7 @@ import type { MatchDetailVO } from '@/types/match'
 import { useMatchStore } from '@/stores/match'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditStore } from '@/stores/audit'
-import { useChatStore } from '@/stores/chat'
+import { useChatStore, type ChatThread } from '@/stores/chat'
 
 const route = useRoute()
 const router = useRouter()
@@ -157,18 +157,32 @@ const companyName = computed(() => {
 
 const chatAvailable = computed(() => Boolean(personAccount.value && companyAccount.value))
 
-const chatThread = computed(() => {
-  if (!chatAvailable.value) return null
-  return chatStore.ensureThread({
-    personAccount: personAccount.value,
-    personName: personName.value,
-    companyAccount: companyAccount.value,
-    companyName: companyName.value,
-    contextRecordId: recordId.value,
-    contextTitle: isCompany.value ? detail.value?.candidateTitle || '候选人沟通' : detail.value?.jobTitle || '岗位沟通',
-    contextOrg: isCompany.value ? detail.value?.candidateOrg || '' : detail.value?.jobOrg || '',
-  })
-})
+const chatThread = ref<ChatThread | null>(null)
+const chatThreadLoading = ref(false)
+
+const syncChatThread = async () => {
+  if (!chatAvailable.value) {
+    chatThread.value = null
+    return
+  }
+  chatThreadLoading.value = true
+  try {
+    chatThread.value = await chatStore.ensureThread({
+      personAccount: personAccount.value,
+      personName: personName.value,
+      companyAccount: companyAccount.value,
+      companyName: companyName.value,
+      contextRecordId: recordId.value,
+      contextTitle: isCompany.value ? detail.value?.candidateTitle || '候选人沟通' : detail.value?.jobTitle || '岗位沟通',
+      contextOrg: isCompany.value ? detail.value?.candidateOrg || '' : detail.value?.jobOrg || '',
+    })
+  } catch (e: any) {
+    chatThread.value = null
+    ElMessage.warning(e?.message || '初始化会话失败')
+  } finally {
+    chatThreadLoading.value = false
+  }
+}
 
 const activeThreadMessages = computed(() => (chatThread.value ? chatStore.messagesByThread(chatThread.value.id) : []))
 const chatUnreadCount = computed(() => {
@@ -241,11 +255,19 @@ const scrollChatToBottom = async () => {
 }
 
 const openChat = async () => {
-  if (!chatAvailable.value || !chatThread.value) {
+  if (!chatAvailable.value) {
     ElMessage.warning('当前记录缺少可聊天的对端身份')
     return
   }
-  chatStore.markThreadRead(chatThread.value.id, side.value, auth.userId.trim())
+  if (!chatThread.value) await syncChatThread()
+  if (!chatThread.value) return
+  try {
+    await chatStore.loadMessages(chatThread.value.id)
+    await chatStore.markThreadRead(chatThread.value.id, side.value, auth.userId.trim())
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载消息失败')
+    return
+  }
   chatDrawerOpen.value = true
   audit.hydrate()
   audit.add({ module: 'chat.open', result: 'OK', detail: { threadId: chatThread.value.id, recordId: recordId.value, side: side.value } })
@@ -254,19 +276,23 @@ const openChat = async () => {
 
 const sendChatMessage = async () => {
   if (!chatThread.value || !auth.userId.trim()) return
-  const sent = chatStore.sendMessage({
-    threadId: chatThread.value.id,
-    senderRole: side.value,
-    senderAccount: auth.userId.trim(),
-    senderName: isCompany.value ? companyName.value : personName.value,
-    text: chatDraft.value,
-  })
-  if (!sent) return
-  chatDraft.value = ''
-  chatStore.markThreadRead(chatThread.value.id, side.value, auth.userId.trim())
-  audit.hydrate()
-  audit.add({ module: 'chat.send', result: 'OK', detail: { threadId: chatThread.value.id, recordId: recordId.value, side: side.value } })
-  await scrollChatToBottom()
+  try {
+    const sent = await chatStore.sendMessage({
+      threadId: chatThread.value.id,
+      senderRole: side.value,
+      senderAccount: auth.userId.trim(),
+      senderName: isCompany.value ? companyName.value : personName.value,
+      text: chatDraft.value,
+    })
+    if (!sent) return
+    chatDraft.value = ''
+    await chatStore.markThreadRead(chatThread.value.id, side.value, auth.userId.trim())
+    audit.hydrate()
+    audit.add({ module: 'chat.send', result: 'OK', detail: { threadId: chatThread.value.id, recordId: recordId.value, side: side.value } })
+    await scrollChatToBottom()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '发送失败')
+  }
 }
 
 const submitFeedback = async () => {
@@ -305,7 +331,7 @@ const load = async () => {
       }
     }
     matchStore.hydrate()
-    chatStore.hydrate()
+    await syncChatThread()
     if (detail.value) {
       const prev = matchStore.historyByUser(userKey.value).find((h) => h.recordId === recordId.value)
       matchStore.addHistory(
@@ -343,7 +369,11 @@ const clearFeedback = async () => {
 
 watch(chatDrawerOpen, async (open) => {
   if (!open || !chatThread.value || !auth.userId.trim()) return
-  chatStore.markThreadRead(chatThread.value.id, side.value, auth.userId.trim())
+  try {
+    await chatStore.markThreadRead(chatThread.value.id, side.value, auth.userId.trim())
+  } catch {
+    /* ignore */
+  }
   await scrollChatToBottom()
 })
 
@@ -357,7 +387,7 @@ watch(
 
 onMounted(() => {
   matchStore.hydrate()
-  chatStore.hydrate()
+  void chatStore.hydrate()
   load()
 })
 

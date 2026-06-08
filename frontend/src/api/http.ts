@@ -34,5 +34,20 @@ http.interceptors.response.use(
     }
     return resp.data
   },
-  (err) => Promise.reject(err),
+  (err) => {
+    const status = err.response?.status as number | undefined
+    const body = err.response?.data as ApiEnvelope<unknown> | undefined
+    if (body && typeof body === 'object' && 'message' in body && body.message) {
+      return Promise.reject(new Error(body.message))
+    }
+    if (!err.response) {
+      return Promise.reject(new Error('无法连接后端，请确认 backend 已启动'))
+    }
+    if (status === 500 || status === 502 || status === 503) {
+      return Promise.reject(
+        new Error('后端不可用（可能尚未启动完成），请稍后重试或检查开发代理端口是否为 8080'),
+      )
+    }
+    return Promise.reject(err)
+  },
 )

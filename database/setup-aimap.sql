@@ -1,12 +1,14 @@
--- 在 MySQL 8 / GreatSQL 上以管理员账号执行一次（mysql -u root -p < setup-aimap.sql）
--- 创建库、应用账号及权限；应用启动时 Flyway 会自动建业务表。
+-- 在 openGauss 上以管理员账号（如 omm / gaussdb）执行一次，然后启动 Spring Boot 应用。
+-- 示例：gsql -d postgres -U omm -W -f setup-aimap.sql
 
-CREATE DATABASE IF NOT EXISTS aimap
-  DEFAULT CHARACTER SET utf8mb4
-  DEFAULT COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE aimap ENCODING 'UTF8' TEMPLATE template0;
 
-CREATE USER IF NOT EXISTS 'aimap'@'%' IDENTIFIED BY 'aimap_dev';
-ALTER USER 'aimap'@'%' IDENTIFIED BY 'aimap_dev';
+CREATE USER aimap IDENTIFIED BY 'AimapDev1!';
 
-GRANT ALL PRIVILEGES ON aimap.* TO 'aimap'@'%';
-FLUSH PRIVILEGES;
+GRANT ALL PRIVILEGES ON DATABASE aimap TO aimap;
+
+\c aimap
+
+GRANT ALL ON SCHEMA public TO aimap;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO aimap;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO aimap;

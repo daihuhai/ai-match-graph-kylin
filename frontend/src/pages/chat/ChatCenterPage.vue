@@ -15,15 +15,11 @@ const currentAccount = computed(() => auth.userId.trim())
 const draft = ref('')
 const activeThreadId = ref('')
 const messagesRef = ref<HTMLElement>()
+const loading = ref(false)
+const sending = ref(false)
 
 const myThreads = computed(() =>
-  chatStore.threads
-    .filter((thread) =>
-      currentRole.value === 'COMPANY'
-        ? thread.companyAccount === currentAccount.value
-        : thread.personAccount === currentAccount.value,
-    )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  [...chatStore.threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
 )
 
 const activeThread = computed(() => myThreads.value.find((x) => x.id === activeThreadId.value) ?? myThreads.value[0] ?? null)
@@ -53,9 +49,13 @@ const unreadTextFor = (threadId: string) => {
   return `${count} 条新消息`
 }
 
-const syncRead = () => {
+const syncRead = async () => {
   if (!activeThread.value || !currentAccount.value) return
-  chatStore.markThreadRead(activeThread.value.id, currentRole.value, currentAccount.value)
+  try {
+    await chatStore.markThreadRead(activeThread.value.id, currentRole.value, currentAccount.value)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '标记已读失败')
+  }
 }
 
 const scrollToBottom = async () => {
@@ -67,27 +67,39 @@ const scrollToBottom = async () => {
 
 const openThread = async (threadId: string) => {
   activeThreadId.value = threadId
-  syncRead()
-  audit.hydrate()
-  audit.add({ module: 'chat.center.open', result: 'OK', detail: { threadId, side: currentRole.value } })
-  await scrollToBottom()
+  try {
+    await chatStore.loadMessages(threadId)
+    await syncRead()
+    audit.hydrate()
+    audit.add({ module: 'chat.center.open', result: 'OK', detail: { threadId, side: currentRole.value } })
+    await scrollToBottom()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载消息失败')
+  }
 }
 
 const sendMessage = async () => {
   if (!activeThread.value || !draft.value.trim() || !currentAccount.value) return
-  const senderName = currentRole.value === 'COMPANY' ? activeThread.value.companyName : activeThread.value.personName
-  chatStore.sendMessage({
-    threadId: activeThread.value.id,
-    senderRole: currentRole.value,
-    senderAccount: currentAccount.value,
-    senderName,
-    text: draft.value,
-  })
-  draft.value = ''
-  syncRead()
-  audit.hydrate()
-  audit.add({ module: 'chat.center.send', result: 'OK', detail: { threadId: activeThread.value.id, side: currentRole.value } })
-  await scrollToBottom()
+  sending.value = true
+  try {
+    const senderName = currentRole.value === 'COMPANY' ? activeThread.value.companyName : activeThread.value.personName
+    await chatStore.sendMessage({
+      threadId: activeThread.value.id,
+      senderRole: currentRole.value,
+      senderAccount: currentAccount.value,
+      senderName,
+      text: draft.value,
+    })
+    draft.value = ''
+    await syncRead()
+    audit.hydrate()
+    audit.add({ module: 'chat.center.send', result: 'OK', detail: { threadId: activeThread.value.id, side: currentRole.value } })
+    await scrollToBottom()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '发送失败')
+  } finally {
+    sending.value = false
+  }
 }
 
 watch(
@@ -97,29 +109,41 @@ watch(
       activeThreadId.value = ''
       return
     }
-    if (!threads.some((x) => x.id === activeThreadId.value)) activeThreadId.value = threads[0].id
-    syncRead()
-    await scrollToBottom()
+    if (!threads.some((x) => x.id === activeThreadId.value)) {
+      await openThread(threads[0].id)
+    }
   },
-  { immediate: true },
+  { immediate: false },
 )
 
 watch(
   () => activeMessages.value.length,
   async () => {
-    syncRead()
     await scrollToBottom()
   },
 )
 
-onMounted(() => {
-  chatStore.hydrate()
-  if (!currentAccount.value) ElMessage.warning('当前登录信息缺失，消息中心可能无法正常显示')
+onMounted(async () => {
+  if (!currentAccount.value) {
+    ElMessage.warning('当前登录信息缺失，消息中心可能无法正常显示')
+    return
+  }
+  loading.value = true
+  try {
+    await chatStore.hydrate()
+    if (myThreads.value.length) {
+      await openThread(myThreads.value[0].id)
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载会话失败')
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4" v-loading="loading">
     <el-card shadow="never">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -153,7 +177,7 @@ onMounted(() => {
                 </el-tag>
               </div>
               <div class="mt-1 truncate text-xs text-zinc-500">
-                {{ thread.contextTitle }}<span v-if="thread.contextOrg"> 路 {{ thread.contextOrg }}</span>
+                {{ thread.contextTitle }}<span v-if="thread.contextOrg"> · {{ thread.contextOrg }}</span>
               </div>
               <div class="mt-2 text-xs text-zinc-400">{{ fmt(thread.updatedAt) }}</div>
             </div>
@@ -169,7 +193,7 @@ onMounted(() => {
             <div class="text-base font-semibold text-zinc-900">{{ counterpartName }}</div>
             <div class="mt-1 text-sm text-zinc-600">{{ counterpartRoleLabel }}</div>
             <div class="mt-1 text-xs text-zinc-500">
-              {{ activeThread.contextTitle }}<span v-if="activeThread.contextOrg"> 路 {{ activeThread.contextOrg }}</span>
+              {{ activeThread.contextTitle }}<span v-if="activeThread.contextOrg"> · {{ activeThread.contextOrg }}</span>
             </div>
           </div>
 
@@ -210,7 +234,7 @@ onMounted(() => {
               <button
                 type="button"
                 class="inline-flex h-10 w-28 items-center justify-center rounded-md bg-emerald-500 px-4 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
-                :disabled="!draft.trim()"
+                :disabled="!draft.trim() || sending"
                 @click="sendMessage"
               >
                 发送

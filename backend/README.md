@@ -3,27 +3,28 @@
 ## 1) Prerequisites
 - JDK 17+
 - Maven 3.9+
-- **GreatSQL**（或与 MySQL 8 协议兼容的实例）用于持久化；表结构由 **Flyway** 自动创建。
+- **openGauss**（国产数据库，PostgreSQL 兼容协议）用于持久化；表结构由 **Flyway** 自动创建。
 
 ## 1.5) 数据库：建库与连接
 
-### 方式 A：Docker 本地开发（推荐，协议与 GreatSQL 兼容）
+### 方式 A：Docker 本地开发（推荐）
 
-1. 安装并启动 **Docker Desktop**，在**仓库根目录**执行：`docker compose up -d`（`docker-compose.yml` 将 MySQL 8 映射到本机 **3307**，避免占用已有 **3306** 实例）。
-2. 复制 `backend/.env.backend.example` 为 `backend/.env.backend`（或保留已有文件），确保含：`DB_HOST=127.0.0.1`、`DB_PORT=3307`、`DB_USER=aimap`、`DB_PASSWORD=aimap_dev`。
-3. 启动后端后 Flyway 自动建表；亦可先运行 `powershell -File .\scripts\setup-database.ps1` 尝试拉起容器。
+1. 安装并启动 **Docker Desktop**，在**仓库根目录**执行：`docker compose up -d`（`docker-compose.yml` 将 openGauss 映射到本机 **5432**）。
+2. 执行 `powershell -File .\scripts\ensure-dev-db.ps1` 创建库 `aimap` 与用户 `aimap`（`setup-database.ps1` 会一并执行）。
+3. 复制 `backend/.env.backend.example` 为 `backend/.env.backend`，确保含：`DB_HOST=127.0.0.1`、`DB_PORT=5432`、`DB_USER=aimap`、`DB_PASSWORD=aimap_dev`。
+4. 启动后端后 Flyway 自动建表。
 
-### 方式 B：本机 GreatSQL / MySQL
+### 方式 B：银河麒麟 / 本机 openGauss
 
-1. 使用具备权限的账号执行仓库根目录 **`database/setup-aimap.sql`**（创建库 `aimap` 与用户 `aimap` / `aimap_dev`），或仅执行：  
-   `backend/src/main/resources/db/install-greatsql.sql`（仅建库）并自行创建同名账号与授权。
-2. 在 **`backend/.env.backend`** 中设置实际 `DB_HOST`、`DB_PORT`（多为 `3306`）、`DB_USER`、`DB_PASSWORD`。
-4. 启动应用后 **Flyway** 会执行 `classpath:db/migration` 下的脚本，创建并填充：
+1. 安装 openGauss（V3/V5 社区版均可），使用管理员账号执行仓库根目录 **`database/setup-aimap.sql`**（创建库 `aimap` 与用户 `aimap` / `aimap_dev`），或仅执行  
+   `backend/src/main/resources/db/install-opengauss.sql`（仅建库）并自行创建同名账号与授权。
+2. 在 **`backend/.env.backend`** 中设置实际 `DB_HOST`、`DB_PORT`（默认 **5432**）、`DB_USER`、`DB_PASSWORD`。
+3. 启动应用后 **Flyway** 会执行 `classpath:db/migration` 下的脚本，创建并填充：
    - `aimap_user`（含 demo / admin 种子用户）
    - `aimap_document`（文档解析任务）
    - `aimap_job_market`、`aimap_talent_pool`（Flyway V3 由职位/候选人示例目录重命名并扩展；企业 JD 进人才市场，个人自愿进人才库）
 
-JDBC URL 形态与 MySQL 一致：`jdbc:mysql://主机:端口/aimap?...`（见 `application.yml`）。
+JDBC URL 形态：`jdbc:opengauss://主机:端口/aimap?currentSchema=public&...`（见 `application.yml`）。
 
 ## 2) Configure Ark API Key
 
@@ -108,3 +109,9 @@ Service starts at `http://localhost:8080`.
 - `POST /api/v1/llm/extract`
 - `POST /api/v1/llm/explain-match`
 - `POST /api/v1/llm/generate-suggestion`
+- **消息中心**（需登录，`PERSON` / `COMPANY`；数据表 V7，按参与者隔离）：
+  - `GET /api/v1/chat/threads` — 当前用户收件箱
+  - `POST /api/v1/chat/threads` — 创建或确保会话（body: `personAccount`, `companyAccount`, `contextRecordId`, 及可选展示名/标题）
+  - `GET /api/v1/chat/threads/{threadId}/messages`
+  - `POST /api/v1/chat/threads/{threadId}/messages` — body `{ "text": "..." }`
+  - `POST /api/v1/chat/threads/{threadId}/read` — body 可选 `{ "lastMessageId": 123 }`

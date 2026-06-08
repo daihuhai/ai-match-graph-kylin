@@ -1,6 +1,6 @@
 ALTER TABLE aimap_talent_pool
-  ADD COLUMN target_company_user_type VARCHAR(16) NULL AFTER owner_account,
-  ADD COLUMN target_company_account VARCHAR(128) NULL AFTER target_company_user_type;
+  ADD COLUMN target_company_user_type VARCHAR(16) NULL,
+  ADD COLUMN target_company_account VARCHAR(128) NULL;
 
 UPDATE aimap_talent_pool
 SET target_company_user_type = 'COMPANY',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watchEffect } from 'vue'
+import { computed, onMounted, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
@@ -11,18 +11,16 @@ const router = useRouter()
 const { toggleTheme, isDark } = useTheme()
 const chatStore = useChatStore()
 
-chatStore.hydrate()
+onMounted(() => {
+  if (auth.isLoggedIn && auth.userType !== 'ADMIN') {
+    void chatStore.hydrate()
+  }
+})
 
 const basePath = computed(() => (auth.userType === 'COMPANY' ? '/company' : '/person'))
 const currentRole = computed(() => (auth.userType === 'COMPANY' ? 'COMPANY' : 'PERSON') as ChatRole)
 
-const myThreads = computed(() => {
-  const account = auth.userId.trim()
-  if (!account) return []
-  return chatStore.threads.filter((thread) =>
-    auth.userType === 'COMPANY' ? thread.companyAccount === account : thread.personAccount === account,
-  )
-})
+const myThreads = computed(() => chatStore.threads)
 
 const currentThreadCount = computed(() => myThreads.value.length)
 

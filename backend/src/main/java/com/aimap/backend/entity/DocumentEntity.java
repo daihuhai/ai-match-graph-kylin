@@ -25,13 +25,13 @@ public class DocumentEntity {
   @Column(name = "started_at_ms", nullable = false)
   private long startedAtMs;
 
-  @Column(name = "result_text", columnDefinition = "mediumtext")
+  @Column(name = "result_text", columnDefinition = "text")
   private String resultText;
 
-  @Column(name = "resume_critique", columnDefinition = "mediumtext")
+  @Column(name = "resume_critique", columnDefinition = "text")
   private String resumeCritique;
 
-  @Column(name = "job_critique", columnDefinition = "mediumtext")
+  @Column(name = "job_critique", columnDefinition = "text")
   private String jobCritique;
 
   @Column(name = "resume_holland_json", columnDefinition = "json")
