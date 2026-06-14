@@ -10,7 +10,8 @@ import org.flywaydb.core.internal.exception.FlywaySqlException;
 import org.flywaydb.core.internal.util.StringUtils;
 
 /**
- * openGauss rejects {@code SET ROLE} when Flyway restores the login role. Skip role restore.
+ * Some PostgreSQL-compatible databases used in domestic environments handle role / search_path
+ * restoration differently. Keep restore as a no-op and rely on an explicit current schema.
  */
 public class PostgreSQLConnection extends Connection<PostgreSQLDatabase> {
   protected PostgreSQLConnection(PostgreSQLDatabase database, java.sql.Connection connection) {
@@ -19,7 +20,7 @@ public class PostgreSQLConnection extends Connection<PostgreSQLDatabase> {
 
   @Override
   protected void doRestoreOriginalState() {
-    // no-op for openGauss compatibility
+    // no-op for PostgreSQL-compatible database compatibility
   }
 
   @Override

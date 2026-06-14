@@ -74,4 +74,26 @@ public final class JsonHelper {
       return List.of();
     }
   }
+
+  public static String educationToJson(List<Map<String, String>> education) {
+    if (education == null || education.isEmpty()) {
+      return "[]";
+    }
+    try {
+      return OM.writeValueAsString(education);
+    } catch (Exception e) {
+      return "[]";
+    }
+  }
+
+  public static List<Map<String, String>> parseEducation(String json) {
+    if (!StringUtils.hasText(json)) {
+      return List.of();
+    }
+    try {
+      return OM.readValue(json, new TypeReference<List<Map<String, String>>>() {});
+    } catch (Exception e) {
+      return List.of();
+    }
+  }
 }

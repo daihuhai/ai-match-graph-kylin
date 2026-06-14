@@ -41,13 +41,7 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.opengauss</groupId>
-      <artifactId>opengauss-jdbc</artifactId>
-      <version>5.0.3-og</version>
-      <scope>runtime</scope>
-    </dependency>
-    <!-- Flyway 迁移使用 PostgreSQL 协议连接 openGauss -->
+    <!-- KingbaseES 走 PostgreSQL 协议接入，保持与现有 Flyway / Hibernate 配置兼容 -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>

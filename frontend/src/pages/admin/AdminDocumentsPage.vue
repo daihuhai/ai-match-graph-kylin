@@ -82,7 +82,7 @@ const exportCsv = () => {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="text-base font-semibold">文档库</div>
-          <div class="mt-1 text-sm text-zinc-600">查看全量上传记录与解析结果入口（演示）。</div>
+          <div class="mt-1 text-sm text-app-text">查看全量上传记录与解析结果入口（演示）。</div>
         </div>
       </div>
     </el-card>
@@ -126,8 +126,8 @@ const exportCsv = () => {
     </el-card>
 
     <el-drawer v-model="drawerOpen" title="解析结果" size="50%">
-      <div v-if="loading" class="text-sm text-zinc-600">加载中...</div>
-      <div v-else-if="!current" class="text-sm text-zinc-600">暂无数据</div>
+      <div v-if="loading" class="text-sm text-app-text">加载中...</div>
+      <div v-else-if="!current" class="text-sm text-app-text">暂无数据</div>
       <div v-else class="space-y-3">
         <el-descriptions :column="1" border>
           <el-descriptions-item label="DocId">{{ current.docId }}</el-descriptions-item>

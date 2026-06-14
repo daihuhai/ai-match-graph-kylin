@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -42,6 +43,17 @@ public class DocumentOriginalStorageService {
       throw new IllegalArgumentException("原始文档不存在");
     }
     return new FileSystemResource(path);
+  }
+
+  public void delete(String docId) {
+    try {
+      for (String ext : List.of(".pdf", ".doc", ".docx", ".bin")) {
+        Path path = rootDir.resolve(docId + ext).normalize();
+        Files.deleteIfExists(path);
+      }
+    } catch (IOException e) {
+      throw new IllegalStateException("删除原始文档失败: " + e.getMessage(), e);
+    }
   }
 
   private Path resolvePath(String docId, String fileName) {

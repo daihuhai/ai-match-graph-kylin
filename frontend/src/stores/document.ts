@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
+import axios from 'axios'
 import type { DocFileVO, DocStatus, ParseResultVO } from '@/types/document'
 import { getDataStorage } from '@/utils/storage'
+import { http } from '@/api/http'
 
 export interface DocumentState {
   docs: DocFileVO[]
@@ -72,6 +74,14 @@ export const useDocumentStore = defineStore('document', {
       this.docs = this.docs.filter((d) => d.id !== docId)
       this.clearResult(docId)
       this.persist()
+    },
+    async deleteDoc(docId: string) {
+      const httpInstance = axios.create({
+        baseURL: '/api',
+        timeout: 15000,
+      })
+      await httpInstance.delete(`/v1/document/${docId}`)
+      this.removeDoc(docId)
     },
   },
 })

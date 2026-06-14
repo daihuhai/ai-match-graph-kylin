@@ -127,7 +127,7 @@ const goGraph = () => {
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="text-base font-semibold">解析结果</div>
-          <div class="mt-1 text-sm text-zinc-600">DocId：{{ docId }}</div>
+          <div class="mt-1 text-sm text-app-text">DocId：{{ docId }}</div>
         </div>
         <div class="flex items-center gap-2">
           <el-button @click="router.push(`${base}/doc/task/${docId}`)">返回任务</el-button>
@@ -137,12 +137,12 @@ const goGraph = () => {
     </el-card>
 
     <el-card shadow="never">
-      <div v-if="loading" class="text-sm text-zinc-600">加载中...</div>
-      <div v-else-if="!data" class="text-sm text-zinc-600">暂无数据</div>
+      <div v-if="loading" class="text-sm text-app-text">加载中...</div>
+      <div v-else-if="!data" class="text-sm text-app-text">暂无数据</div>
       <div v-else class="space-y-4">
         <el-card v-if="!isCompany && data.status === 'DONE'" shadow="never">
           <div class="flex flex-wrap items-center gap-3">
-            <div class="flex-1 text-sm text-zinc-700">
+            <div class="flex-1 text-sm text-app-text">
               只有你主动选择企业投递后，简历才会进入该企业的人才库。每家企业只能看到投给自己的简历。
             </div>
             <el-select v-if="canDeliver" v-model="selectedCompanyAccount" placeholder="选择企业" style="width: 220px">
@@ -156,9 +156,9 @@ const goGraph = () => {
         </el-card>
 
         <el-card v-if="!isCompany && data.status === 'DONE'" shadow="never">
-          <div class="text-sm font-semibold text-zinc-800">人才市场岗位匹配</div>
-          <div class="mt-1 text-xs text-zinc-500">这里是简历对人才市场岗位的匹配，不依赖企业投递。</div>
-          <div v-if="jobMatchesLoading" class="mt-3 text-sm text-zinc-600">加载中...</div>
+          <div class="text-sm font-semibold text-app-text">人才市场岗位匹配</div>
+          <div class="mt-1 text-xs text-app-subtext">这里是简历对人才市场岗位的匹配，不依赖企业投递。</div>
+          <div v-if="jobMatchesLoading" class="mt-3 text-sm text-app-text">加载中...</div>
           <el-table v-else class="mt-3" :data="jobMatches" size="small" max-height="360">
             <el-table-column prop="title" label="岗位" min-width="200" />
             <el-table-column prop="org" label="来源" min-width="160" />
@@ -178,15 +178,15 @@ const goGraph = () => {
         <el-tabs>
           <el-tab-pane v-if="resumeCritique || jobCritique || hollandRows.length" label="AI 分析">
             <el-card v-if="resumeCritique" shadow="never" class="mb-4">
-              <div class="text-sm font-semibold text-zinc-700">简历分析</div>
-              <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-zinc-50 p-4 text-sm text-zinc-800">{{ resumeCritique }}</pre>
+              <div class="text-sm font-semibold text-app-text">简历分析</div>
+              <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-app-bg p-4 text-sm text-app-text">{{ resumeCritique }}</pre>
             </el-card>
             <el-card v-if="jobCritique" shadow="never" class="mb-4">
-              <div class="text-sm font-semibold text-zinc-700">岗位分析</div>
-              <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-zinc-50 p-4 text-sm text-zinc-800">{{ jobCritique }}</pre>
+              <div class="text-sm font-semibold text-app-text">岗位分析</div>
+              <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-app-bg p-4 text-sm text-app-text">{{ jobCritique }}</pre>
             </el-card>
             <el-card v-if="hollandRows.length" shadow="never">
-              <div class="text-sm font-semibold text-zinc-700">霍兰德 RIASEC</div>
+              <div class="text-sm font-semibold text-app-text">霍兰德 RIASEC</div>
               <el-table class="mt-3" :data="hollandRows" size="small" border>
                 <el-table-column prop="code" label="维度" width="90" />
                 <el-table-column prop="label" label="类型" width="120" />
@@ -202,32 +202,32 @@ const goGraph = () => {
 
             <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <el-card shadow="never" class="lg:col-span-1">
-                <div class="text-sm font-semibold text-zinc-700">技能</div>
+                <div class="text-sm font-semibold text-app-text">技能</div>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <el-tag v-for="s in skills" :key="s" type="success">{{ s }}</el-tag>
-                  <div v-if="skills.length === 0" class="text-sm text-zinc-600">暂无</div>
+                  <div v-if="skills.length === 0" class="text-sm text-app-text">暂无</div>
                 </div>
               </el-card>
               <el-card shadow="never" class="lg:col-span-2">
-                <div class="text-sm font-semibold text-zinc-700">教育经历</div>
+                <div class="text-sm font-semibold text-app-text">教育经历</div>
                 <div class="mt-3 space-y-2">
-                  <div v-for="(e, idx) in educations" :key="idx" class="rounded-lg border border-zinc-200 bg-white p-3">
-                    <div class="text-sm text-zinc-800">{{ e.school || '未知学校' }}</div>
-                    <div class="mt-1 text-xs text-zinc-500">{{ [e.degree, e.major].filter(Boolean).join(' / ') }}</div>
+                  <div v-for="(e, idx) in educations" :key="idx" class="rounded-lg border border-app-border bg-app-panel p-3">
+                    <div class="text-sm text-app-text">{{ e.school || '未知学校' }}</div>
+                    <div class="mt-1 text-xs text-app-subtext">{{ [e.degree, e.major].filter(Boolean).join(' / ') }}</div>
                   </div>
-                  <div v-if="educations.length === 0" class="text-sm text-zinc-600">暂无</div>
+                  <div v-if="educations.length === 0" class="text-sm text-app-text">暂无</div>
                 </div>
               </el-card>
             </div>
 
             <el-card shadow="never" class="mt-4">
-              <div class="text-sm font-semibold text-zinc-700">项目经历</div>
+              <div class="text-sm font-semibold text-app-text">项目经历</div>
               <div class="mt-3 space-y-2">
-                <div v-for="(p, idx) in projects" :key="idx" class="rounded-lg border border-zinc-200 bg-white p-3">
-                  <div class="text-sm text-zinc-800">{{ p.name || '未命名项目' }}</div>
-                  <div class="mt-1 text-sm text-zinc-600">{{ p.summary || '暂无描述' }}</div>
+                <div v-for="(p, idx) in projects" :key="idx" class="rounded-lg border border-app-border bg-app-panel p-3">
+                  <div class="text-sm text-app-text">{{ p.name || '未命名项目' }}</div>
+                  <div class="mt-1 text-sm text-app-text">{{ p.summary || '暂无描述' }}</div>
                 </div>
-                <div v-if="projects.length === 0" class="text-sm text-zinc-600">暂无</div>
+                <div v-if="projects.length === 0" class="text-sm text-app-text">暂无</div>
               </div>
             </el-card>
 

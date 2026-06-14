@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAuditStore } from '@/stores/audit'
 import { useDocumentStore } from '@/stores/document'
 import AppEmpty from '@/components/AppEmpty.vue'
+import { Briefcase, Building2, Search, SlidersHorizontal, RefreshCw, Star, History, Bookmark, ArrowRight, Eye, Send, RotateCcw } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -190,215 +191,280 @@ const toggleFav = (recordId: string) => {
   audit.hydrate()
   audit.add({ module: 'match.favorite.toggle', result: 'OK', detail: { recordId } })
 }
+
+const getScoreColor = (score: number) => {
+  if (score >= 90) return 'text-emerald-600 bg-emerald-50 border-emerald-200'
+  if (score >= 75) return 'text-blue-600 bg-blue-50 border-blue-200'
+  if (score >= 60) return 'text-amber-600 bg-amber-50 border-amber-200'
+  return 'text-app-text bg-app-bg border-app-border'
+}
+
+const getScoreProgressColor = (score: number) => {
+  if (score >= 90) return '#10b981' // emerald-500
+  if (score >= 75) return '#3b82f6' // blue-500
+  if (score >= 60) return '#f59e0b' // amber-500
+  return '#94a3b8' // slate-400
+}
 </script>
 
 <template>
-  <div class="space-y-4">
-    <el-card shadow="never">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="text-base font-semibold">{{ title }}</div>
-          <div class="mt-1 text-sm text-zinc-600">
-            霍兰德 RIASEC：企业端从系统人才库匹配候选人；个人端从人才市场（含企业发布的 JD）匹配岗位。可设置最低匹配度。
-          </div>
-          <div v-if="isPerson" class="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-            投入时可选择文档中心中的任一已完成简历版本；取出时按版本生效。
-          </div>
-          <div class="mt-4 flex max-w-md flex-col gap-2">
-            <div class="flex items-center justify-between text-xs text-zinc-600">
-              <span>最低匹配度</span>
-              <span class="font-medium text-zinc-800">{{ minMatch }}%</span>
+  <div class="space-y-6">
+    <!-- Header Card -->
+    <div class="glass-panel rounded-3xl p-8">
+      <div class="flex flex-col lg:flex-row justify-between gap-8 items-center">
+        <div class="flex-1">
+          <h2 class="text-3xl font-extrabold text-app-text dark:text-white flex items-center gap-3 tracking-tight">
+            <div class="p-2.5 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl text-indigo-600 dark:text-indigo-400">
+              <Search class="w-6 h-6" />
             </div>
-            <el-slider v-model="minMatch" :min="0" :max="100" :step="1" show-stops :marks="{ 0: '0', 60: '60', 100: '100' }" />
-          </div>
+            {{ title }}
+          </h2>
+          <p class="mt-4 text-[15px] text-app-subtext dark:text-zinc-400 leading-relaxed max-w-2xl">
+            基于大模型与霍兰德 RIASEC 理论，为您进行双向智能匹配。
+            <template v-if="isPerson">从人才市场海量岗位中，发现最适合您的发展机会。您可以一键将简历投入感兴趣的企业人才库。</template>
+            <template v-else>从全平台人才库中，为您推荐最匹配的候选人。</template>
+          </p>
         </div>
-        <el-button type="primary" :loading="loading" @click="load">应用并刷新</el-button>
+        
+        <div class="w-full lg:w-80 bg-app-panel/60 dark:bg-zinc-900/60 backdrop-blur rounded-2xl p-5 border border-app-border/50 dark:border-zinc-800/50 shadow-sm flex flex-col justify-center">
+          <div class="flex items-center justify-between text-sm font-semibold text-app-text dark:text-zinc-300 mb-4">
+            <span class="flex items-center gap-2"><SlidersHorizontal class="w-4 h-4 text-indigo-500" /> 最低匹配度过滤</span>
+            <span class="text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md">{{ minMatch }}%</span>
+          </div>
+          <el-slider v-model="minMatch" :min="0" :max="100" :step="1" :show-tooltip="false" class="!px-2" />
+          <el-button type="primary" class="w-full mt-5 !h-10 !rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !border-none shadow-md shadow-indigo-500/20 transition-all active:scale-[0.98]" :loading="loading" @click="load">
+            <RefreshCw class="w-4 h-4 mr-2" :class="{'animate-spin': loading}" />
+            应用过滤并刷新
+          </el-button>
+        </div>
       </div>
-    </el-card>
+    </div>
 
-    <el-card shadow="never">
-      <el-tabs v-model="tab">
-        <el-tab-pane label="推荐" name="recommend" />
-        <el-tab-pane label="收藏" name="favorite" />
-        <el-tab-pane label="历史" name="history" />
-      </el-tabs>
+    <!-- Main Content -->
+    <div class="bg-app-panel/60 dark:bg-zinc-900/40 backdrop-blur-sm rounded-3xl border border-app-border/50 dark:border-zinc-800/50 shadow-sm overflow-hidden">
+      <!-- Custom Tabs -->
+      <div class="flex border-b border-app-border/50 dark:border-zinc-800/50 px-4 pt-4 bg-app-bg/30 dark:bg-zinc-900/30">
+        <button 
+          v-for="t in [{id: 'recommend', label: '智能推荐', icon: Star}, {id: 'favorite', label: '我的收藏', icon: Bookmark}, {id: 'history', label: '浏览历史', icon: History}]" 
+          :key="t.id"
+          class="flex items-center gap-2 px-6 py-3.5 text-[15px] font-semibold border-b-2 transition-all relative outline-none"
+          :class="tab === t.id ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-app-subtext hover:text-app-text dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-app-bg/50 dark:hover:bg-zinc-800/50 rounded-t-xl'"
+          @click="tab = t.id as any"
+        >
+          <component :is="t.icon" class="w-[18px] h-[18px]" :class="tab === t.id ? 'text-indigo-600 dark:text-indigo-400' : ''" />
+          {{ t.label }}
+        </button>
+      </div>
 
-      <AppEmpty v-if="tab === 'recommend' && !loading && list.length === 0" description="暂无推荐数据。">
-        <el-button type="primary" @click="load">刷新</el-button>
-      </AppEmpty>
-      <el-table v-if="tab === 'recommend'" :data="list" v-loading="loading">
-        <el-table-column prop="title" label="名称" min-width="240" />
-        <el-table-column prop="org" label="组织/备注" min-width="180" />
-        <el-table-column v-if="isPerson" label="已投入" width="120">
-          <template #default="{ row }">
-            <el-tag v-if="deliveredCountForCompany(row.companyAccount)" type="success">{{ deliveredCountForCompany(row.companyAccount) }} 个版本</el-tag>
-            <span v-else class="text-sm text-zinc-500">未投入</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="score" label="匹配度" width="120">
-          <template #default="{ row }">
-            <el-tag type="success">{{ row.score }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" :width="isPerson ? 280 : 200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="openDetail(row)">查看</el-button>
-            <el-button
-              v-if="isPerson"
-              link
-              type="primary"
-              :disabled="resumeVersions.length === 0 || !row.companyAccount"
-              @click="openPoolDialog(row)"
-            >
-              投入/取出
-            </el-button>
-            <el-button link :type="favoriteSet.has(row.recordId) ? 'warning' : 'info'" @click="toggleFav(row.recordId)">
-              {{ favoriteSet.has(row.recordId) ? '已收藏' : '收藏' }}
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- List Content -->
+      <div class="p-6 sm:p-8 min-h-[400px]">
+        <!-- Recommend Tab -->
+        <template v-if="tab === 'recommend'">
+          <AppEmpty v-if="!loading && list.length === 0" description="未找到满足当前匹配度的数据，请尝试调低过滤阈值。">
+            <el-button type="primary" @click="load">刷新重试</el-button>
+          </AppEmpty>
+          
+          <div v-else-if="loading" class="space-y-4">
+            <div v-for="i in 3" :key="i" class="h-24 bg-app-bg dark:bg-slate-800 rounded-xl animate-pulse"></div>
+          </div>
+          
+          <TransitionGroup name="list" tag="div" class="grid grid-cols-1 gap-4 relative" v-else>
+            <div v-for="row in list" :key="row.recordId" class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-xl border border-app-border dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group bg-app-panel dark:bg-slate-800">
+              <div class="flex-1 min-w-0 pr-4">
+                <div class="flex items-center gap-3 mb-2">
+                  <h3 class="text-lg font-bold text-app-text dark:text-white truncate" :title="row.title">{{ row.title }}</h3>
+                  <el-tag v-if="isPerson && deliveredCountForCompany(row.companyAccount)" type="success" effect="light" round size="small" class="!border-emerald-200">
+                    已投递 {{ deliveredCountForCompany(row.companyAccount) }} 份
+                  </el-tag>
+                </div>
+                <div class="flex items-center text-sm text-app-subtext dark:text-app-subtext gap-4">
+                  <span class="flex items-center gap-1.5 truncate max-w-xs" :title="row.org">
+                    <Building2 class="w-4 h-4 text-app-subtext" />
+                    {{ row.org }}
+                  </span>
+                  <span v-if="isPerson && row.companyAccount" class="hidden sm:inline-block px-2 py-0.5 rounded-md bg-app-bg dark:bg-slate-700 text-xs font-mono">
+                    ID: {{ row.companyAccount }}
+                  </span>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-6 mt-4 sm:mt-0 w-full sm:w-auto shrink-0 justify-between sm:justify-end">
+                <div class="flex flex-col items-center">
+                  <div class="text-xs text-app-subtext mb-1">匹配度</div>
+                  <div class="flex items-center justify-center w-12 h-12 rounded-full border-2" :class="getScoreColor(row.score)">
+                    <span class="text-sm font-bold">{{ row.score }}</span>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-2 border-l border-app-border dark:border-slate-700 pl-6">
+                  <button 
+                    @click="toggleFav(row.recordId)" 
+                    class="p-2 rounded-lg transition-colors"
+                    :class="favoriteSet.has(row.recordId) ? 'text-amber-500 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30' : 'text-app-subtext hover:text-app-text hover:bg-app-bg dark:hover:bg-slate-700'"
+                    :title="favoriteSet.has(row.recordId) ? '取消收藏' : '收藏'"
+                  >
+                    <Bookmark class="w-5 h-5" :class="{'fill-current': favoriteSet.has(row.recordId)}" />
+                  </button>
+                  
+                  <el-button v-if="isPerson" class="!px-3" :disabled="resumeVersions.length === 0 || !row.companyAccount" @click="openPoolDialog(row)">
+                    投递管理
+                  </el-button>
+                  
+                  <el-button type="primary" class="!bg-indigo-600 hover:!bg-indigo-700 !border-none !px-4" @click="openDetail(row)">
+                    匹配详情 <ArrowRight class="w-4 h-4 ml-1" />
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </TransitionGroup>
+        </template>
 
-      <AppEmpty v-else-if="tab === 'favorite' && favoriteList.length === 0" description="暂无收藏。">
-        <el-button @click="tab = 'recommend'">去推荐列表</el-button>
-      </AppEmpty>
-      <el-table v-else-if="tab === 'favorite'" :data="favoriteList">
-        <el-table-column prop="title" label="名称" min-width="240" />
-        <el-table-column prop="org" label="组织/备注" min-width="180" />
-        <el-table-column v-if="isPerson" label="已投入" width="120">
-          <template #default="{ row }">
-            <el-tag v-if="deliveredCountForCompany(row.companyAccount)" type="success">{{ deliveredCountForCompany(row.companyAccount) }} 个版本</el-tag>
-            <span v-else class="text-sm text-zinc-500">未投入</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="score" label="匹配度" width="120">
-          <template #default="{ row }">
-            <el-tag type="success">{{ row.score }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" :width="isPerson ? 280 : 200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="openDetail(row)">查看</el-button>
-            <el-button
-              v-if="isPerson"
-              link
-              type="primary"
-              :disabled="resumeVersions.length === 0 || !row.companyAccount"
-              @click="openPoolDialog(row)"
-            >
-              投入/取出
-            </el-button>
-            <el-button link type="danger" @click="toggleFav(row.recordId)">取消收藏</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <!-- Favorite Tab -->
+        <template v-else-if="tab === 'favorite'">
+          <AppEmpty v-if="favoriteList.length === 0" description="您还没有收藏任何推荐项。">
+            <el-button type="primary" @click="tab = 'recommend'">去发现更多</el-button>
+          </AppEmpty>
+          
+          <TransitionGroup name="list" tag="div" class="grid grid-cols-1 gap-4 relative" v-else>
+            <div v-for="row in favoriteList" :key="row.recordId" class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-xl border border-amber-200 dark:border-amber-900/50 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 bg-amber-50/30 dark:bg-amber-900/10">
+              <div class="flex-1 min-w-0 pr-4">
+                <div class="flex items-center gap-3 mb-2">
+                  <h3 class="text-lg font-bold text-app-text dark:text-white truncate" :title="row.title">{{ row.title }}</h3>
+                  <el-tag v-if="isPerson && deliveredCountForCompany(row.companyAccount)" type="success" effect="light" round size="small">已投递</el-tag>
+                </div>
+                <div class="flex items-center text-sm text-app-subtext gap-2">
+                  <Building2 class="w-4 h-4" />
+                  <span class="truncate" :title="row.org">{{ row.org }}</span>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-6 mt-4 sm:mt-0 w-full sm:w-auto shrink-0 justify-between sm:justify-end">
+                <div class="px-3 py-1 rounded-full border text-sm font-bold" :class="getScoreColor(row.score)">
+                  {{ row.score }}分
+                </div>
+                
+                <div class="flex items-center gap-2">
+                  <el-button type="danger" plain size="small" @click="toggleFav(row.recordId)">取消收藏</el-button>
+                  <el-button type="primary" size="small" class="!bg-indigo-600" @click="openDetail(row)">查看详情</el-button>
+                </div>
+              </div>
+            </div>
+          </TransitionGroup>
+        </template>
 
-      <AppEmpty v-else-if="tab === 'history' && historyList.length === 0" description="暂无历史记录。" />
-      <el-table v-else :data="historyList">
-        <el-table-column prop="title" label="名称" min-width="240" />
-        <el-table-column prop="org" label="组织/备注" min-width="180" />
-        <el-table-column v-if="isPerson" label="已投入" width="120">
-          <template #default="{ row }">
-            <el-tag v-if="deliveredCountForCompany(row.companyAccount)" type="success">{{ deliveredCountForCompany(row.companyAccount) }} 个版本</el-tag>
-            <span v-else class="text-sm text-zinc-500">未投入</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="score" label="匹配度" width="120">
-          <template #default="{ row }">
-            <el-tag type="success">{{ row.score }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="viewedAt" label="最近查看" width="200">
-          <template #default="{ row }">
-            <span class="text-xs text-zinc-600">{{ fmt(row.viewedAt) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" :width="isPerson ? 280 : 200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="openDetail(row)">查看</el-button>
-            <el-button
-              v-if="isPerson"
-              link
-              type="primary"
-              :disabled="resumeVersions.length === 0 || !row.companyAccount"
-              @click="openPoolDialog(row)"
-            >
-              投入/取出
-            </el-button>
-            <el-button link :type="favoriteSet.has(row.recordId) ? 'warning' : 'info'" @click="toggleFav(row.recordId)">
-              {{ favoriteSet.has(row.recordId) ? '已收藏' : '收藏' }}
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+        <!-- History Tab -->
+        <template v-else>
+          <AppEmpty v-if="historyList.length === 0" description="暂无浏览历史记录。" />
+          
+          <TransitionGroup name="list" tag="div" class="grid grid-cols-1 gap-4 relative" v-else>
+            <div v-for="row in historyList" :key="row.recordId" class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border border-app-border dark:border-slate-800 bg-app-bg/50 dark:bg-slate-800/50 hover:bg-app-panel dark:hover:bg-slate-800 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+              <div class="flex-1 min-w-0 pr-4">
+                <div class="flex items-center gap-2 mb-1">
+                  <h4 class="font-medium text-app-text dark:text-slate-200 truncate">{{ row.title }}</h4>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold border" :class="getScoreColor(row.score)">{{ row.score }}分</span>
+                </div>
+                <div class="text-xs text-app-subtext flex items-center gap-4">
+                  <span class="truncate max-w-[200px]">{{ row.org }}</span>
+                  <span class="flex items-center gap-1"><History class="w-3 h-3" /> {{ fmt(row.viewedAt) }}</span>
+                </div>
+              </div>
+              
+              <div class="mt-3 sm:mt-0 flex gap-2">
+                <el-button size="small" @click="openDetail(row)">再次查看</el-button>
+              </div>
+            </div>
+          </TransitionGroup>
+        </template>
+      </div>
+    </div>
   </div>
 
-  <el-dialog v-model="poolDialog" title="投入/取出简历版本" width="560px">
-    <div class="space-y-4">
-      <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-sm text-zinc-700">
-        <div class="font-medium text-zinc-900">{{ activeRow?.title || '-' }}</div>
-        <div class="mt-1 text-zinc-600">{{ activeRow?.org || '-' }}</div>
-        <div class="mt-2 text-xs text-zinc-500">目标企业账号：{{ activeCompanyAccount || '未知' }}</div>
+  <!-- Delivery Dialog -->
+  <el-dialog v-model="poolDialog" title="简历投递管理" width="500px" class="!rounded-2xl" destroy-on-close>
+    <div class="space-y-5">
+      <!-- Target Info -->
+      <div class="flex items-center gap-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
+        <div class="w-12 h-12 rounded-lg bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center shrink-0">
+          <Building2 class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-app-text dark:text-white truncate text-base">{{ activeRow?.title || '-' }}</div>
+          <div class="text-sm text-app-text dark:text-app-subtext truncate mt-0.5">{{ activeRow?.org || '-' }}</div>
+        </div>
       </div>
 
-      <AppEmpty v-if="resumeVersions.length === 0" description="文档中心暂无已完成的简历版本。">
-        <el-button type="primary" @click="router.push('/person/doc/list')">去文档中心</el-button>
+      <AppEmpty v-if="resumeVersions.length === 0" description="文档中心暂无已解析完成的简历。">
+        <el-button type="primary" @click="router.push('/person/doc/list')">去上传简历</el-button>
       </AppEmpty>
 
       <template v-else>
-        <div>
-          <div class="mb-2 text-sm font-medium text-zinc-800">选择投入版本</div>
-          <el-select v-model="poolForm.docId" class="w-full" placeholder="请选择简历版本">
+        <!-- Version Selection -->
+        <div class="space-y-2">
+          <label class="text-sm font-semibold text-app-text dark:text-slate-200">选择要操作的简历版本</label>
+          <el-select v-model="poolForm.docId" class="w-full" placeholder="请选择简历版本" size="large">
             <el-option
               v-for="doc in resumeVersions"
               :key="doc.id"
-              :label="`${doc.fileName} · ${doc.createdAt}`"
+              :label="`${doc.fileName}`"
               :value="doc.id"
-            />
+            >
+              <div class="flex justify-between items-center w-full">
+                <span>{{ doc.fileName }}</span>
+                <span class="text-xs text-app-subtext">{{ doc.createdAt.split('T')[0] }}</span>
+              </div>
+            </el-option>
           </el-select>
         </div>
 
-        <div class="rounded-lg border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
-          <div>当前选中：{{ selectedVersionLabel || '未选择' }}</div>
-          <div class="mt-2">
-            状态：
-            <el-tag :type="selectedVersionDelivered ? 'success' : 'info'">
-              {{ selectedVersionDelivered ? '已投入该企业' : '尚未投入该企业' }}
+        <!-- Status Card -->
+        <div v-if="poolForm.docId" class="p-4 rounded-xl border border-app-border dark:border-slate-700 bg-app-panel dark:bg-slate-800">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-app-text dark:text-app-subtext">当前版本投递状态：</span>
+            <el-tag :type="selectedVersionDelivered ? 'success' : 'info'" effect="dark" round>
+              {{ selectedVersionDelivered ? '已投递给该企业' : '尚未投递' }}
             </el-tag>
           </div>
         </div>
 
-        <div>
-          <div class="mb-2 text-sm font-medium text-zinc-800">当前已投入的版本</div>
-          <div v-if="deliveredVersionsForActiveCompany.length" class="flex flex-wrap gap-2">
-            <el-tag v-for="doc in deliveredVersionsForActiveCompany" :key="doc.id" type="success">
+        <!-- History Info -->
+        <div v-if="deliveredVersionsForActiveCompany.length" class="pt-2">
+          <div class="text-xs text-app-subtext mb-2">已投递给该企业的其他版本：</div>
+          <div class="flex flex-wrap gap-2">
+            <el-tag v-for="doc in deliveredVersionsForActiveCompany" :key="doc.id" type="info" size="small" class="!bg-app-bg !text-app-text">
               {{ doc.fileName }}
             </el-tag>
           </div>
-          <div v-else class="text-sm text-zinc-500">当前企业还没有收到你的任何简历版本。</div>
         </div>
       </template>
     </div>
 
     <template #footer>
-      <el-button @click="poolDialog = false">关闭</el-button>
-      <el-button
-        type="danger"
-        :disabled="resumeVersions.length === 0 || !poolForm.docId || !selectedVersionDelivered"
-        :loading="poolLoading"
-        @click="submitPoolChange(false)"
-      >
-        取出
-      </el-button>
-      <el-button
-        type="primary"
-        :disabled="resumeVersions.length === 0 || !poolForm.docId || selectedVersionDelivered"
-        :loading="poolLoading"
-        @click="submitPoolChange(true)"
-      >
-        投入
-      </el-button>
+      <div class="flex justify-end gap-3 pt-4 border-t border-app-border dark:border-slate-800 mt-4">
+        <el-button @click="poolDialog = false" size="large" class="!rounded-lg">取消</el-button>
+        
+        <el-button
+          v-if="selectedVersionDelivered"
+          type="danger"
+          size="large"
+          class="!rounded-lg !px-6"
+          :loading="poolLoading"
+          @click="submitPoolChange(false)"
+        >
+          <RotateCcw class="w-4 h-4 mr-2" /> 撤回简历
+        </el-button>
+        
+        <el-button
+          v-else
+          type="primary"
+          size="large"
+          class="!rounded-lg !bg-indigo-600 hover:!bg-indigo-700 !border-none !px-6"
+          :disabled="resumeVersions.length === 0 || !poolForm.docId"
+          :loading="poolLoading"
+          @click="submitPoolChange(true)"
+        >
+          <Send class="w-4 h-4 mr-2" /> 确认投递
+        </el-button>
+      </div>
     </template>
   </el-dialog>
 </template>

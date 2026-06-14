@@ -22,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -93,6 +94,7 @@ public class DocumentController {
     Map<String, Integer> jobHolland = "JOB_DESC".equals(docType) ? parsed.riasec() : Map.of();
 
     List<String> resumeSkillPayload = "RESUME".equals(docType) ? parsed.skills() : List.of();
+    List<Map<String, String>> resumeEducationPayload = "RESUME".equals(docType) ? parsed.education() : List.of();
 
     String docId =
         dataService.createDocTask(
@@ -105,6 +107,7 @@ public class DocumentController {
             jobCritique,
             jobHolland,
             resumeSkillPayload,
+            resumeEducationPayload,
             user);
     originalStorageService.save(docId, name, file);
 
@@ -189,13 +192,15 @@ public class DocumentController {
     String tail =
         """
 
-        请给出：
+        【重要】请严格按以下顺序给出所有字段，缺一不可：
+
         1) 简历优势、不足与可操作的改进建议（需分条、专业、中文；有正文时须引用正文中的经历/技能要点）。
         2) 求职者的霍兰德 RIASEC 六维强度（0-100 整数）：R现实型、I研究型、A艺术型、S社会型、E企业型、C常规型。
         3) 从正文或文件名可合理推断的 3～12 个关键技术词或能力短语（勿编造明显无关项），放入 skills 数组。
+        4) 【必填】教育经历信息：必须从正文中提取学校名称、学历层次（大专/专科/本科/硕士/博士等，务必准确区分）、专业名称，放入 education 数组。若正文中确实找不到任何教育信息，则填 [{"school":"未知","degree":"未知","major":"未知"}]，绝不可省略此字段。
 
-        你必须只输出一个 JSON 对象（不要 markdown 代码块、不要前后解释），格式严格如下：
-        {"critique":{"strengths":["..."],"weaknesses":["..."],"improvements":["..."]},"riasec":{"R":0,"I":0,"A":0,"S":0,"E":0,"C":0},"skills":["..."]}
+        你必须只输出一个 JSON 对象（不要 markdown 代码块、不要前后解释），格式严格如下（education 为必填字段）：
+        {"critique":{"strengths":["..."],"weaknesses":["..."],"improvements":["..."]},"riasec":{"R":0,"I":0,"A":0,"S":0,"E":0,"C":0},"skills":["..."],"education":[{"school":"...","degree":"...","major":"..."}]}
         """;
     return head + bodyBlock + tail;
   }
@@ -262,8 +267,12 @@ public class DocumentController {
     } else {
       resultJson.put("skills", demoSkills);
     }
-    resultJson.put(
-        "education", List.of(Map.of("school", "某高校", "degree", "本科", "major", "计算机科学与技术")));
+    if ("RESUME".equals(task.docType()) && !task.resumeEducation().isEmpty()) {
+      resultJson.put("education", task.resumeEducation());
+    } else {
+      resultJson.put(
+          "education", List.of(Map.of("school", "某高校", "degree", "本科", "major", "计算机科学与技术")));
+    }
     resultJson.put(
         "projects",
         List.of(Map.of("name", "能力图谱系统", "summary", task.resultText() == null ? "" : task.resultText())));
@@ -341,5 +350,17 @@ public class DocumentController {
       return;
     }
     throw new IllegalArgumentException("当前账号无权查看该原始文档");
+  }
+
+  @DeleteMapping("/{id}")
+  public ApiResponse<Map<String, Object>> delete(
+      @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+      @PathVariable("id") String docId) {
+    LoggedUser user =
+        BearerUserResolver.fromAuthorization(authorization)
+            .orElseThrow(() -> new IllegalArgumentException("请先登录"));
+    dataService.deleteDocument(docId, user);
+    originalStorageService.delete(docId);
+    return ApiResponse.ok(Map.of("success", true, "docId", docId));
   }
 }

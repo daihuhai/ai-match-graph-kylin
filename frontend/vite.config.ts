@@ -15,7 +15,6 @@ export default defineConfig({
           vue: ['vue', 'vue-router', 'pinia'],
           element: ['element-plus'],
           echarts: ['echarts'],
-          g6: ['@antv/g6'],
         },
       },
     },

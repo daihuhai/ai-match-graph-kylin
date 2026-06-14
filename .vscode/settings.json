@@ -1,4 +1,5 @@
 {
     "window.autoDetectColorScheme": false,
-    "window.confirmSaveUntitledWorkspace": false
+    "window.confirmSaveUntitledWorkspace": false,
+    "java.compile.nullAnalysis.mode": "automatic"
 }

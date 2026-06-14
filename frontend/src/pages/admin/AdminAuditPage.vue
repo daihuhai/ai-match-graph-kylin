@@ -67,7 +67,7 @@ const clearAll = async () => {
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="text-base font-semibold">日志审计</div>
-          <div class="mt-1 text-sm text-zinc-600">演示“按用户/模块筛选 + 表格展示”。</div>
+          <div class="mt-1 text-sm text-app-text">演示“按用户/模块筛选 + 表格展示”。</div>
         </div>
       </div>
     </el-card>
@@ -92,7 +92,7 @@ const clearAll = async () => {
       <el-table :data="list">
         <el-table-column prop="time" label="时间" width="200">
           <template #default="{ row }">
-            <span class="text-xs text-zinc-600">{{ fmt(row.time) }}</span>
+            <span class="text-xs text-app-text">{{ fmt(row.time) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="userKey" label="用户" width="200">
@@ -116,7 +116,7 @@ const clearAll = async () => {
   </div>
 
   <el-drawer v-model="drawerOpen" title="审计详情" size="520px">
-    <div v-if="!current" class="text-sm text-zinc-600">暂无</div>
+    <div v-if="!current" class="text-sm text-app-text">暂无</div>
     <div v-else class="space-y-3">
       <el-descriptions :column="1" border>
         <el-descriptions-item label="时间">{{ fmt(current.time) }}</el-descriptions-item>

@@ -2,12 +2,14 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 
-const props = defineProps<{
-  title: string
+const props = withDefaults(defineProps<{
+  title?: string
   personValues: number[]
   targetValues: number[]
   labels?: { person?: string; target?: string }
-}>()
+}>(), {
+  title: '',
+})
 
 const el = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
@@ -26,7 +28,7 @@ const render = () => {
   ]
 
   chart.setOption({
-    title: { text: props.title, left: 'center', top: 8, textStyle: { fontSize: 12 } },
+    title: props.title ? { text: props.title, left: 'center', top: 8, textStyle: { fontSize: 12 } } : undefined,
     tooltip: {},
     legend: {
       top: 30,
@@ -62,5 +64,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="el" class="h-[320px] w-full rounded-xl border border-zinc-200 bg-white" />
+  <div ref="el" class="h-[320px] w-full rounded-xl border border-app-border bg-app-panel" />
 </template>

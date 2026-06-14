@@ -61,9 +61,6 @@ public class MatchController {
       @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
       @PathVariable("id") String recordId) {
     Optional<LoggedUser> user = BearerUserResolver.fromAuthorization(authorization);
-    if (recordId.startsWith("rec-job-") || recordId.startsWith("rec-cand-")) {
-      return ApiResponse.ok(dataService.legacyMatchDetail(recordId));
-    }
     if (recordId.startsWith("job-") || recordId.startsWith("jm-")) {
       return ApiResponse.ok(dataService.matchDetailForJob(recordId, user));
     }

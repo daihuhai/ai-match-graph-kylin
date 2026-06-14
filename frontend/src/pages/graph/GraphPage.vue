@@ -57,16 +57,17 @@ const decorated = computed<GraphData>(() => {
     const isFocus = focus.has(n.id)
     const isSelected = n.id === selectedId.value
     const style = {
-      opacity: isFocus ? 1 : 0.18,
-      lineWidth: isSelected ? 4 : 2,
-      stroke: isSelected ? '#111827' : '#ffffff',
+      ...n.style,
+      opacity: isFocus ? 1 : 0.3,
+      lineWidth: isSelected ? 3 : 2,
+      stroke: isSelected ? 'selected' : 'normal',
     }
     return { ...n, style }
   })
   const edges = baseData.value.edges.map((e) => {
     if (!shouldDim) return e
     const onPath = focus.has(e.source) && focus.has(e.target)
-    const style = { opacity: onPath ? 0.9 : 0.12 }
+    const style = { ...e.style, opacity: onPath ? 1 : 0.15 }
     return { ...e, style }
   })
   return { nodes, edges }
@@ -191,11 +192,11 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-4">
-    <el-card shadow="never" class="border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <el-card shadow="never" class="border-app-border bg-app-panel">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{{ title }}</div>
-          <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <div class="text-base font-semibold text-app-text">{{ title }}</div>
+          <div class="mt-1 text-sm text-app-text">
             支持拖拽、缩放与布局切换；支持搜索定位与节点详情；可按需展开邻居（mock）。
           </div>
         </div>
@@ -220,11 +221,11 @@ onMounted(async () => {
       </div>
     </el-card>
 
-    <div v-if="loading" class="text-sm text-zinc-600 dark:text-zinc-400">加载中...</div>
+    <div v-if="loading" class="text-sm text-app-text">加载中...</div>
     <GraphCanvas v-else ref="graphRef" :data="decorated" :layout="layout" @node-click="onNodeClick" @canvas-click="onCanvasClick" />
 
     <el-drawer v-model="drawerOpen" title="节点详情" size="420px">
-      <div v-if="!selectedNode" class="text-sm text-zinc-600 dark:text-zinc-400">请选择一个节点</div>
+      <div v-if="!selectedNode" class="text-sm text-app-text">请选择一个节点</div>
       <div v-else class="space-y-3">
         <el-descriptions :column="1" border>
           <el-descriptions-item label="名称">{{ selectedNode.label }}</el-descriptions-item>
@@ -238,7 +239,7 @@ onMounted(async () => {
         </div>
 
         <div>
-          <div class="text-sm font-semibold text-zinc-700 dark:text-zinc-200">邻居节点</div>
+          <div class="text-sm font-semibold text-app-text">邻居节点</div>
           <div class="mt-2 flex flex-wrap gap-2">
             <el-tag
               v-for="id in Array.from(neighborSet).filter((x) => x !== selectedNode.id)"
@@ -248,7 +249,7 @@ onMounted(async () => {
             >
               {{ nodeMap.get(id)?.label || id }}
             </el-tag>
-            <div v-if="neighborSet.size <= 1" class="text-sm text-zinc-600 dark:text-zinc-400">暂无</div>
+            <div v-if="neighborSet.size <= 1" class="text-sm text-app-text">暂无</div>
           </div>
         </div>
       </div>

@@ -16,11 +16,8 @@ router.beforeEach((to) => {
     hydrated = true
   }
 
-  if (to.meta?.title) {
-    document.title = `AI智能匹配与能力图谱系统 · ${to.meta.title}`
-  } else {
-    document.title = 'AI智能匹配与能力图谱系统'
-  }
+  // 标题由各布局组件自行管理（MainLayout 带未读数前缀，AuthLayout 使用固定标题）
+  document.title = 'AI智能匹配与能力图谱系统'
 
   if (to.meta?.public) return true
   if (!auth.isLoggedIn) return { name: 'Login', query: { redirect: to.fullPath } }

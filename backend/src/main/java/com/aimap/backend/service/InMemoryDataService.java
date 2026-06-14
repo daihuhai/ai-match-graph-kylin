@@ -43,12 +43,14 @@ public class InMemoryDataService {
       Map<String, Integer> jobHolland,
       String ownerUserType,
       String ownerAccount,
-      List<String> resumeSkills) {
+      List<String> resumeSkills,
+      List<Map<String, String>> resumeEducation) {
 
     public DocumentTask {
       resumeHolland = resumeHolland == null ? Map.of() : Map.copyOf(resumeHolland);
       jobHolland = jobHolland == null ? Map.of() : Map.copyOf(jobHolland);
       resumeSkills = resumeSkills == null ? List.of() : List.copyOf(resumeSkills);
+      resumeEducation = resumeEducation == null ? List.of() : List.copyOf(resumeEducation);
     }
   }
 
@@ -60,9 +62,6 @@ public class InMemoryDataService {
       List<String> skills) {}
 
   public record CompanyTarget(String account) {}
-
-  private static final Map<String, Integer> DEFAULT_PERSON_HOLLAND =
-      Map.of("r", 42, "i", 48, "a", 32, "s", 50, "e", 38, "c", 44);
 
   private final UserRepository userRepository;
   private final DocumentRepository documentRepository;
@@ -164,6 +163,7 @@ public class InMemoryDataService {
       String jobCritique,
       Map<String, Integer> jobHolland,
       List<String> resumeSkills,
+      List<Map<String, String>> resumeEducation,
       Optional<LoggedUser> uploader) {
     String id = "doc-" + UUID.randomUUID().toString().substring(0, 8);
     DocumentEntity d = new DocumentEntity();
@@ -178,6 +178,7 @@ public class InMemoryDataService {
     d.setResumeHollandJson(JsonHelper.riasecToJson(resumeHolland));
     d.setJobHollandJson(JsonHelper.riasecToJson(jobHolland));
     d.setResumeSkillsJson(JsonHelper.skillsToJson(resumeSkills));
+    d.setResumeEducationJson(JsonHelper.educationToJson(resumeEducation));
     uploader.ifPresent(
         u -> {
           d.setOwnerUserType(u.userType());
@@ -237,7 +238,8 @@ public class InMemoryDataService {
         JsonHelper.parseRiasec(d.getJobHollandJson()),
         d.getOwnerUserType(),
         d.getOwnerAccount(),
-        JsonHelper.parseSkills(d.getResumeSkillsJson()));
+        JsonHelper.parseSkills(d.getResumeSkillsJson()),
+        JsonHelper.parseEducation(d.getResumeEducationJson()));
   }
 
   public static String statusByElapsed(long elapsed) {
@@ -258,7 +260,7 @@ public class InMemoryDataService {
         .map(UserEntity::getResumeRiasecJson)
         .map(JsonHelper::parseRiasec)
         .filter(m -> !m.isEmpty())
-        .orElse(DEFAULT_PERSON_HOLLAND);
+        .orElse(Map.of("r", 42, "i", 48, "a", 32, "s", 50, "e", 38, "c", 44));
   }
 
   @Transactional(readOnly = true)
@@ -278,12 +280,12 @@ public class InMemoryDataService {
         .map(JobMarketEntity::getRiasecJson)
         .map(JsonHelper::parseRiasec)
         .filter(m -> !m.isEmpty())
-        .orElse(DEFAULT_PERSON_HOLLAND);
+        .orElse(Map.of("r", 42, "i", 48, "a", 32, "s", 50, "e", 38, "c", 44));
   }
 
   @Transactional(readOnly = true)
   public List<Map<String, Object>> recommendJobsForHolland(Map<String, Integer> personHolland, int minScore) {
-    Map<String, Integer> p = personHolland == null || personHolland.isEmpty() ? DEFAULT_PERSON_HOLLAND : personHolland;
+    Map<String, Integer> p = personHolland == null || personHolland.isEmpty() ? Map.of("r", 42, "i", 48, "a", 32, "s", 50, "e", 38, "c", 44) : personHolland;
     List<Map<String, Object>> rows = new ArrayList<>();
     for (JobMarketEntity j : jobMarketRepository.findAllByOrderByRecordIdAsc()) {
       TalentEntity t = toTalent(j);
@@ -485,6 +487,22 @@ public class InMemoryDataService {
     }
   }
 
+  @Transactional
+  public void deleteDocument(String docId, LoggedUser user) {
+    DocumentEntity d =
+        documentRepository.findById(docId).orElseThrow(() -> new IllegalArgumentException("文档不存在"));
+    if (!"ADMIN".equals(user.userType())) {
+      boolean ownerMatch =
+          user.userType().equals(d.getOwnerUserType()) && user.account().equals(d.getOwnerAccount());
+      if (!ownerMatch) {
+        throw new IllegalArgumentException("无权限删除该文档");
+      }
+    }
+    talentPoolRepository.deleteByDocumentId(docId);
+    jobMarketRepository.deleteByDocumentId(docId);
+    documentRepository.deleteById(docId);
+  }
+
   private static String jobRecordIdFromDocId(String docId) {
     return "jm-" + docId.substring(4);
   }
@@ -593,47 +611,5 @@ public class InMemoryDataService {
                 Map.of("type", "GRAPH", "field", "HOLLAND", "snippet", "霍兰德雷达对齐度", "weight", 0.2))),
         Map.entry("riasec", Map.of("person", person, "target", target, "similarity", similarity)),
         Map.entry("suggestions", List.of("结合解析报告中的改进建议持续优化简历或 JD 表述。", "上传最新版文档可刷新霍兰德估计与匹配结果。")));
-  }
-
-  /** Legacy ids rec-job-* / rec-cand-* still supported for old bookmarks. */
-  public Map<String, Object> legacyMatchDetail(String recordId) {
-    boolean isJob = recordId.startsWith("rec-job-");
-    int score = isJob ? (recordId.endsWith("002") ? 79 : 86) : (recordId.endsWith("002") ? 77 : 84);
-    Map<String, Integer> person =
-        recordId.endsWith("002")
-            ? Map.of("r", 30, "i", 55, "a", 35, "s", 40, "e", 25, "c", 60)
-            : Map.of("r", 35, "i", 45, "a", 30, "s", 55, "e", 40, "c", 35);
-    Map<String, Integer> target =
-        isJob
-            ? (recordId.endsWith("002")
-                ? Map.of("r", 45, "i", 50, "a", 25, "s", 30, "e", 40, "c", 55)
-                : Map.of("r", 30, "i", 40, "a", 35, "s", 50, "e", 45, "c", 30))
-            : (recordId.endsWith("002")
-                ? Map.of("r", 40, "i", 45, "a", 30, "s", 55, "e", 35, "c", 40)
-                : Map.of("r", 35, "i", 50, "a", 28, "s", 45, "e", 38, "c", 42));
-    int dist = Math.abs(person.get("r") - target.get("r")) + Math.abs(person.get("i") - target.get("i"))
-        + Math.abs(person.get("a") - target.get("a")) + Math.abs(person.get("s") - target.get("s"))
-        + Math.abs(person.get("e") - target.get("e")) + Math.abs(person.get("c") - target.get("c"));
-    int similarity = Math.max(0, Math.min(100, Math.round(100 - dist / 6f)));
-    return new LinkedHashMap<>(
-        Map.ofEntries(
-            Map.entry("recordId", recordId),
-            Map.entry("score", score),
-            Map.entry("scoreBreakdown", Map.of("skillCoverage", 42, "levelMatch", 20, "vectorSim", 12, "graphReasoning", 12)),
-            Map.entry(
-                "matchedSkills",
-                List.of(
-                    Map.of("name", "Vue 3", "requiredLevel", 3, "personLevel", 3),
-                    Map.of("name", "TypeScript", "requiredLevel", 3, "personLevel", 2))),
-            Map.entry("missingSkills", List.of(Map.of("name", "AntV G6", "requiredLevel", 2, "gap", 2))),
-            Map.entry("rationales", List.of("技能覆盖率较高：核心技能匹配，但图谱能力有缺口。", "图谱推理命中：项目经历与技能节点存在关联边。")),
-            Map.entry(
-                "evidences",
-                List.of(
-                    Map.of("type", "TEXT", "field", "skills", "snippet", "熟悉 Vue3/TS、Spring Boot、SQL...", "weight", 0.35),
-                    Map.of("type", "GRAPH", "field", "HAS_SKILL", "snippet", "Person -> Vue 3 / TypeScript", "weight", 0.25),
-                    Map.of("type", "VECTOR", "field", "embedding", "snippet", "语义相似度（文本向量）", "weight", 0.4))),
-            Map.entry("riasec", Map.of("person", person, "target", target, "similarity", similarity)),
-            Map.entry("suggestions", List.of("补齐图谱可视化能力（G6 基础与交互）", "完善工程化规范：路由守卫、错误兜底与性能分包"))));
   }
 }

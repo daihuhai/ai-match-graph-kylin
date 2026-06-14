@@ -91,7 +91,7 @@ const synonymOk = computed(() => Boolean(synonymForm.term.trim()) && Boolean(syn
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="text-base font-semibold">数据维护</div>
-          <div class="mt-1 text-sm text-zinc-600">技能库与同义词的本地维护（sessionStorage 持久化）。</div>
+          <div class="mt-1 text-sm text-app-text">技能库与同义词的本地维护（sessionStorage 持久化）。</div>
         </div>
       </div>
     </el-card>
@@ -100,7 +100,7 @@ const synonymOk = computed(() => Boolean(synonymForm.term.trim()) && Boolean(syn
       <el-tab-pane label="技能库">
         <el-card shadow="never">
           <div class="flex items-center justify-between gap-3">
-            <div class="text-sm text-zinc-600">用于能力图谱/匹配解释中的标准技能字典。</div>
+            <div class="text-sm text-app-text">用于能力图谱/匹配解释中的标准技能字典。</div>
             <el-button v-permission="'ADMIN_DATA_VIEW'" type="primary" @click="openSkillCreate">新增技能</el-button>
           </div>
           <div class="mt-4">
@@ -121,7 +121,7 @@ const synonymOk = computed(() => Boolean(synonymForm.term.trim()) && Boolean(syn
       <el-tab-pane label="同义词">
         <el-card shadow="never">
           <div class="flex items-center justify-between gap-3">
-            <div class="text-sm text-zinc-600">用于解析与匹配阶段的词汇归一（示例）。</div>
+            <div class="text-sm text-app-text">用于解析与匹配阶段的词汇归一（示例）。</div>
             <el-button v-permission="'ADMIN_DATA_VIEW'" type="primary" @click="openSynonymCreate">新增同义词</el-button>
           </div>
           <div class="mt-4">

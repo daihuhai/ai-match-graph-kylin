@@ -5,12 +5,17 @@
 /backend/target/
 /backend/.env.backend
 /backend/.env.backend.local
+/backend/data/document-originals/
+/backend/check-db.sql
 
-# 前端构建产物（亦见 frontend/.gitignore）
+# 前端构建产物与本地密钥
 /frontend/node_modules/
 /frontend/dist/
+/frontend/.env
+/frontend/tmp/
 
-# IDE / 本机
+# IDE / 本地
 .cursor/
 Thumbs.db
 *.iml
+/frontend/.trae/

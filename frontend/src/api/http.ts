@@ -15,12 +15,7 @@ export const http = axios.create({
 http.interceptors.request.use((config) => {
   const auth = useAuthStore()
   if (auth.token) {
-    config.headers = config.headers ?? new AxiosHeaders()
-    if (config.headers instanceof AxiosHeaders) {
-      config.headers.set('Authorization', `Bearer ${auth.token}`)
-    } else {
-      ;(config.headers as any).Authorization = `Bearer ${auth.token}`
-    }
+    config.headers.set('Authorization', `Bearer ${auth.token}`)
   }
   return config
 })
@@ -28,7 +23,8 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (resp) => {
     const body = resp.data as ApiEnvelope<unknown>
-    if (body && typeof body === 'object' && 'code' in body) {
+    // 判断是否为标准业务响应格式：必须包含 code/message/data 三个字段
+    if (body && typeof body === 'object' && 'code' in body && 'message' in body && 'data' in body) {
       if (body.code !== 200) return Promise.reject(body)
       return body.data
     }

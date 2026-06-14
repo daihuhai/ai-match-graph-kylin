@@ -65,7 +65,7 @@ const goResult = () => router.push(`${base.value}/doc/result/${encodeURIComponen
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="text-base font-semibold">解析任务</div>
-          <div class="mt-1 text-sm text-zinc-600">DocId：{{ docId }}</div>
+          <div class="mt-1 text-sm text-app-text">DocId：{{ docId }}</div>
         </div>
         <div class="flex items-center gap-2">
           <el-tag v-if="status === 'DONE'" type="success">完成</el-tag>
@@ -84,12 +84,12 @@ const goResult = () => router.push(`${base.value}/doc/result/${encodeURIComponen
           <el-step title="完成" description="可查看结果并继续操作" />
         </el-steps>
 
-        <div v-if="loading" class="text-sm text-zinc-600">正在获取状态...</div>
-        <div v-else-if="status === 'FAILED'" class="text-sm text-zinc-600">解析失败，请重新上传或稍后重试。</div>
-        <div v-else-if="status === 'DONE'" class="text-sm text-zinc-600">
+        <div v-if="loading" class="text-sm text-app-text">正在获取状态...</div>
+        <div v-else-if="status === 'FAILED'" class="text-sm text-app-text">解析失败，请重新上传或稍后重试。</div>
+        <div v-else-if="status === 'DONE'" class="text-sm text-app-text">
           解析已完成。个人端可在结果页选择企业投递，企业端只能看到投给自己的简历。
         </div>
-        <div v-else class="text-sm text-zinc-600">状态会自动刷新。</div>
+        <div v-else class="text-sm text-app-text">状态会自动刷新。</div>
 
         <div class="flex justify-end gap-2">
           <el-button @click="router.push(`${base}/doc/list`)">返回文档中心</el-button>

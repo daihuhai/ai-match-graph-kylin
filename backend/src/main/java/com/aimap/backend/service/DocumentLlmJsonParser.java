@@ -14,16 +14,17 @@ import org.springframework.stereotype.Component;
 public class DocumentLlmJsonParser {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  public record ParsedDoc(String critiqueMarkdown, Map<String, Integer> riasec, List<String> skills) {
+  public record ParsedDoc(String critiqueMarkdown, Map<String, Integer> riasec, List<String> skills, List<Map<String, String>> education) {
     public ParsedDoc {
       skills = skills == null ? List.of() : List.copyOf(skills);
+      education = education == null ? List.of() : List.copyOf(education);
     }
   }
 
   public ParsedDoc parse(String rawLlmText, boolean resume) {
     Optional<String> json = JsonObjectExtractor.firstBalancedObject(rawLlmText == null ? "" : rawLlmText);
     if (json.isEmpty()) {
-      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec(), List.of());
+      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec(), List.of(), List.of());
     }
     try {
       JsonNode root = MAPPER.readTree(json.get());
@@ -36,9 +37,10 @@ public class DocumentLlmJsonParser {
         critique = rawLlmText.trim();
       }
       List<String> skills = resume ? readTextSkills(root.path("skills")) : readTextSkills(root.path("critique").path("requiredSkills"));
-      return new ParsedDoc(critique, riasec, skills);
+      List<Map<String, String>> education = readEducation(root.path("education"));
+      return new ParsedDoc(critique, riasec, skills, education);
     } catch (Exception e) {
-      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec(), List.of());
+      return new ParsedDoc(rawLlmText == null ? "" : rawLlmText.trim(), defaultRiasec(), List.of(), List.of());
     }
   }
 
@@ -52,6 +54,31 @@ public class DocumentLlmJsonParser {
         String t = n.asText().trim();
         if (!t.isEmpty() && out.size() < 24) {
           out.add(t);
+        }
+      }
+    }
+    return out;
+  }
+
+  private static List<Map<String, String>> readEducation(JsonNode node) {
+    List<Map<String, String>> out = new ArrayList<>();
+    if (node == null || !node.isArray() || node.isEmpty()) {
+      return out;
+    }
+    for (JsonNode n : node) {
+      if (n.isObject()) {
+        Map<String, String> edu = new LinkedHashMap<>();
+        if (n.has("school") && n.get("school").isTextual()) {
+          edu.put("school", n.get("school").asText().trim());
+        }
+        if (n.has("degree") && n.get("degree").isTextual()) {
+          edu.put("degree", n.get("degree").asText().trim());
+        }
+        if (n.has("major") && n.get("major").isTextual()) {
+          edu.put("major", n.get("major").asText().trim());
+        }
+        if (!edu.isEmpty()) {
+          out.add(edu);
         }
       }
     }

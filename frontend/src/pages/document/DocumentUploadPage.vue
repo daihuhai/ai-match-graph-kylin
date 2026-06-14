@@ -96,7 +96,7 @@ const submit = async () => {
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="text-base font-semibold">{{ title }}</div>
-          <div class="mt-1 text-sm text-zinc-600">
+          <div class="mt-1 text-sm text-app-text">
             支持 PDF/DOC/DOCX，最大 50MB。上传后会自动进入解析进度跟踪。
           </div>
         </div>
@@ -132,8 +132,8 @@ const submit = async () => {
           :on-remove="onRemove"
         >
           <div class="py-8">
-            <div class="text-sm font-semibold text-zinc-900">拖拽文件到此处，或点击选择</div>
-            <div class="mt-1 text-xs text-zinc-500">需后端 8080；若设置 VITE_USE_MOCK=false 则全部走真实接口。</div>
+            <div class="text-sm font-semibold text-app-text">拖拽文件到此处，或点击选择</div>
+            <div class="mt-1 text-xs text-app-subtext">需后端 8080；若设置 VITE_USE_MOCK=false 则全部走真实接口。</div>
           </div>
         </el-upload>
 

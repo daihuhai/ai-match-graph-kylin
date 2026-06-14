@@ -89,7 +89,7 @@ const exportCsv = () => {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="text-base font-semibold">匹配记录</div>
-          <div class="mt-1 text-sm text-zinc-600">聚合查看用户端的匹配历史与反馈（读取本地存储）。</div>
+          <div class="mt-1 text-sm text-app-text">聚合查看用户端的匹配历史与反馈（读取本地存储）。</div>
         </div>
         <el-button v-permission="'ADMIN_MATCH_VIEW'" @click="load">刷新</el-button>
       </div>

@@ -12,6 +12,10 @@ import { useMatchStore } from '@/stores/match'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditStore } from '@/stores/audit'
 import { useChatStore, type ChatThread } from '@/stores/chat'
+import { 
+  ArrowLeft, Bookmark, MessageSquare, Star, RefreshCw, AlertCircle,
+  FileText, ExternalLink, Download, CheckCircle2, ChevronRight, User, Briefcase
+} from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -367,6 +371,13 @@ const clearFeedback = async () => {
   audit.add({ module: 'match.feedback.clear', result: 'OK', detail: { recordId: recordId.value } })
 }
 
+const getScoreProgressColor = (score: number) => {
+  if (score >= 90) return '#10b981'
+  if (score >= 75) return '#3b82f6'
+  if (score >= 60) return '#f59e0b'
+  return '#94a3b8'
+}
+
 watch(chatDrawerOpen, async (open) => {
   if (!open || !chatThread.value || !auth.userId.trim()) return
   try {
@@ -395,264 +406,322 @@ onBeforeUnmount(revokeOriginalUrl)
 </script>
 
 <template>
-  <div class="space-y-4">
-    <el-card shadow="never">
-      <div class="flex flex-wrap items-start justify-between gap-3">
+  <div class="space-y-6 max-w-[1400px] mx-auto">
+    <!-- Action Header -->
+    <div class="bg-app-panel dark:bg-slate-900 rounded-2xl p-5 border border-app-border dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <el-button @click="router.push(`${base}/match/${isCompany ? 'candidates' : 'jobs'}`)" class="!border-none !bg-app-bg dark:!bg-slate-800 hover:!bg-slate-200 dark:hover:!bg-slate-700 !text-app-text dark:!text-slate-300">
+          <ArrowLeft class="w-4 h-4 mr-1" /> 返回列表
+        </el-button>
         <div>
-          <div class="text-base font-semibold">匹配详情</div>
-          <div class="mt-1 text-sm text-zinc-600">RecordId：{{ recordId }}</div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <el-button @click="router.push(`${base}/match/${isCompany ? 'candidates' : 'jobs'}`)">返回列表</el-button>
-          <el-button :type="favorite ? 'warning' : 'info'" @click="toggleFav">{{ favorite ? '已收藏' : '收藏' }}</el-button>
-          <el-button v-if="chatAvailable" type="success" plain @click="openChat">
-            聊一聊
-            <span v-if="chatUnreadCount" class="ml-1 text-xs">({{ chatUnreadCount }})</span>
-          </el-button>
-          <el-button type="primary" @click="feedbackDlg = true">反馈</el-button>
-          <el-button :loading="loading" @click="load">刷新</el-button>
+          <div class="text-lg font-bold text-app-text dark:text-white flex items-center gap-2">
+            匹配详情报告
+            <el-tag size="small" type="info" class="font-mono">{{ recordId }}</el-tag>
+          </div>
         </div>
       </div>
-    </el-card>
+      
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <el-button :type="favorite ? 'warning' : 'info'" plain class="flex-1 sm:flex-none" @click="toggleFav">
+          <Bookmark class="w-4 h-4 mr-1" :class="{'fill-current': favorite}" />
+          {{ favorite ? '已收藏' : '收藏' }}
+        </el-button>
+        <el-button v-if="chatAvailable" type="success" plain class="flex-1 sm:flex-none" @click="openChat">
+          <MessageSquare class="w-4 h-4 mr-1" />
+          沟通
+          <span v-if="chatUnreadCount" class="ml-1 bg-red-500 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{{ chatUnreadCount }}</span>
+        </el-button>
+        <el-button type="primary" plain class="flex-1 sm:flex-none" @click="feedbackDlg = true">
+          <Star class="w-4 h-4 mr-1" /> 评价
+        </el-button>
+        <el-button :loading="loading" @click="load" class="!px-3" title="刷新">
+          <RefreshCw class="w-4 h-4" :class="{'animate-spin': loading}" />
+        </el-button>
+      </div>
+    </div>
 
-    <el-card shadow="never">
-      <div v-if="loading" class="text-sm text-zinc-600">加载中...</div>
-      <div v-else-if="!detail" class="text-sm text-zinc-600">暂无数据</div>
-      <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div class="space-y-4 lg:col-span-1">
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
-            <div class="text-sm font-semibold text-zinc-700">综合得分</div>
-            <div class="mt-2 text-3xl font-semibold text-zinc-900">{{ detail.score }}</div>
-            <div class="mt-2">
-              <el-progress :percentage="detail.score" :stroke-width="10" />
-            </div>
+    <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-app-subtext">
+      <RefreshCw class="w-8 h-8 animate-spin mb-4 text-indigo-500" />
+      <span>正在加载匹配报告及雷达图...</span>
+    </div>
+    
+    <div v-else-if="!detail" class="flex flex-col items-center justify-center py-20 text-app-subtext bg-app-panel dark:bg-slate-900 rounded-2xl border border-app-border dark:border-slate-800">
+      <AlertCircle class="w-12 h-12 mb-4 text-app-subtext" />
+      <span>未找到相关的匹配数据</span>
+    </div>
+
+    <div v-else class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <!-- Left Column: Core Stats -->
+      <div class="space-y-6 lg:col-span-4 xl:col-span-3">
+        <!-- Score Card -->
+        <div class="rounded-2xl border border-app-border dark:border-slate-800 bg-app-panel dark:bg-slate-900 p-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          <div class="absolute inset-0 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/10 dark:to-purple-900/10"></div>
+          <div class="relative z-10 text-center w-full">
+            <h3 class="text-sm font-semibold text-app-subtext dark:text-app-subtext mb-4 uppercase tracking-wider">综合匹配度</h3>
+            <el-progress type="dashboard" :percentage="detail.score" :width="160" :stroke-width="12" :color="getScoreProgressColor(detail.score)">
+              <template #default="{ percentage }">
+                <div class="flex flex-col items-center">
+                  <span class="text-4xl font-black" :style="{ color: getScoreProgressColor(detail.score) }">{{ percentage }}</span>
+                  <span class="text-xs font-medium text-app-subtext mt-1">/ 100</span>
+                </div>
+              </template>
+            </el-progress>
           </div>
+        </div>
 
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
-            <div class="text-sm font-semibold text-zinc-700">解释要点</div>
-            <ul class="mt-3 space-y-1 text-sm text-zinc-700">
-              <li v-for="(r, idx) in detail.rationales || []" :key="idx">{{ r }}</li>
-              <li v-if="(detail.rationales || []).length === 0" class="text-zinc-600">暂无</li>
-            </ul>
-          </div>
-
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
-            <div class="text-sm font-semibold text-zinc-700">待补技能</div>
-            <div class="mt-3 space-y-2">
-              <div v-for="s in detail.missingSkills" :key="s.name" class="flex items-center justify-between gap-3">
-                <div class="text-sm text-zinc-800">{{ s.name }}</div>
-                <el-tag type="danger">差距 {{ s.gap }}</el-tag>
+        <!-- Chat Shortcut -->
+        <div v-if="chatAvailable" class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-5 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors group" @click="openChat">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <MessageSquare class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span class="text-sm font-bold text-emerald-900 dark:text-emerald-300 truncate">沟通通道</span>
               </div>
-              <div v-if="detail.missingSkills.length === 0" class="text-sm text-zinc-600">暂无</div>
+              <div class="text-xs text-emerald-700 dark:text-emerald-500/80 truncate font-medium">{{ chatCounterpartLabel }}</div>
+              <div class="mt-2 text-xs text-emerald-600/80 dark:text-emerald-400/70 line-clamp-2 leading-relaxed bg-app-panel/50 dark:bg-black/20 p-2 rounded-lg border border-emerald-100 dark:border-emerald-800/50">{{ chatLastMessageText }}</div>
             </div>
-          </div>
-
-          <div v-if="chatAvailable" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-sm font-semibold text-emerald-900">聊天窗口</div>
-                <div class="mt-1 text-sm text-emerald-700">{{ chatCounterpartLabel }}</div>
-                <div class="mt-2 text-xs text-emerald-700">{{ chatLastMessageText }}</div>
-              </div>
-              <el-button type="success" plain @click="openChat">聊一聊</el-button>
+            <div class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+              <ChevronRight class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
         </div>
 
-        <div class="space-y-4 lg:col-span-2">
-          <RadarChart title="分项拆解" :indicators="indicators" :values="values" />
+        <!-- Missing Skills -->
+        <div class="rounded-2xl border border-rose-200 dark:border-rose-900/30 bg-app-panel dark:bg-slate-900 p-5">
+          <h3 class="text-sm font-bold text-app-text dark:text-slate-200 mb-4 flex items-center gap-2">
+            <AlertCircle class="w-4 h-4 text-rose-500" />
+            能力差距项
+          </h3>
+          <div class="space-y-3">
+            <div v-for="s in detail.missingSkills" :key="s.name" class="flex flex-col gap-1 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-rose-900 dark:text-rose-300">{{ s.name }}</span>
+                <span class="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/50 px-2 py-0.5 rounded-full">差距 {{ s.gap }}</span>
+              </div>
+            </div>
+            <div v-if="detail.missingSkills.length === 0" class="text-sm text-app-subtext flex items-center justify-center py-4 bg-app-bg dark:bg-slate-800/50 rounded-xl">
+              <CheckCircle2 class="w-4 h-4 mr-2 text-emerald-500" /> 完全覆盖，无明显短板
+            </div>
+          </div>
+        </div>
 
-          <el-card v-if="riasec" shadow="never">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="text-sm font-semibold text-zinc-700">RIASEC 霍兰德画像</div>
-                <div class="mt-1 text-xs text-zinc-500">
-                  人才主导：{{ riasecPersonTop }}；目标主导：{{ riasecTargetTop }}；相似度：{{ riasec.similarity }}%
+        <!-- Rationales -->
+        <div class="rounded-2xl border border-app-border dark:border-slate-800 bg-app-panel dark:bg-slate-900 p-5">
+          <h3 class="text-sm font-bold text-app-text dark:text-slate-200 mb-4 flex items-center gap-2">
+            <FileText class="w-4 h-4 text-blue-500" />
+            系统解析摘要
+          </h3>
+          <ul class="space-y-3">
+            <li v-for="(r, idx) in detail.rationales || []" :key="idx" class="text-sm text-app-text dark:text-slate-300 leading-relaxed flex items-start gap-2 bg-app-bg dark:bg-slate-800/50 p-3 rounded-xl">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0"></span>
+              {{ r }}
+            </li>
+            <li v-if="(detail.rationales || []).length === 0" class="text-sm text-app-subtext text-center py-4">暂无分析摘要</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Right Column: Charts & Details -->
+      <div class="space-y-6 lg:col-span-8 xl:col-span-9">
+        
+        <!-- Radar Charts Row -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <!-- Skills Breakdown -->
+          <div class="rounded-3xl border border-app-border/60 dark:border-zinc-800/60 bg-app-panel/70 dark:bg-zinc-900/70 backdrop-blur-xl p-6 shadow-sm h-[400px] flex flex-col hover:shadow-md transition-shadow">
+            <h3 class="text-base font-bold text-app-text dark:text-zinc-100 mb-2">匹配度拆解雷达</h3>
+            <div class="flex-1 relative -mt-2">
+              <RadarChart :indicators="indicators" :values="values" />
+            </div>
+          </div>
+
+          <!-- RIASEC -->
+          <div v-if="riasec" class="rounded-3xl border border-app-border/60 dark:border-zinc-800/60 bg-app-panel/70 dark:bg-zinc-900/70 backdrop-blur-xl p-6 shadow-sm h-[400px] flex flex-col hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-4 gap-2">
+              <div class="min-w-0">
+                <h3 class="text-base font-bold text-app-text dark:text-zinc-100 truncate">霍兰德职业兴趣 (RIASEC)</h3>
+                <div class="mt-1.5 text-xs text-app-subtext dark:text-zinc-400 font-medium leading-relaxed truncate" :title="`主导特征：${riasecPersonTop} (人) vs ${riasecTargetTop} (岗)`">
+                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">人</span> {{ riasecPersonTop }}
+                  <span class="mx-1.5 text-slate-300 dark:text-zinc-600">|</span>
+                  <span class="text-emerald-600 dark:text-emerald-400 font-bold">岗</span> {{ riasecTargetTop }}
                 </div>
               </div>
-              <el-tag :type="riasecTagType">{{ riasecTagText }}</el-tag>
+              <el-tag :type="riasecTagType" effect="dark" round class="font-bold shrink-0 shadow-sm">{{ riasec.similarity }}% {{ riasecTagText }}</el-tag>
             </div>
-            <div class="mt-3">
+            <div class="flex-1 relative -mt-2">
               <RiasecRadarChart
-                title="RIASEC 雷达图"
                 :person-values="riasecPersonValues"
                 :target-values="riasecTargetValues"
-                :labels="{ person: isCompany ? '人才' : '我', target: '岗位' }"
+                :labels="{ person: isCompany ? '人才' : '个人', target: '岗位' }"
               />
             </div>
-          </el-card>
-
-          <el-card v-if="isCompany && candidateResume" shadow="never">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="text-sm font-semibold text-zinc-700">候选人原始简历</div>
-                <div class="mt-1 text-xs text-zinc-500">
-                  {{ candidateResume.fileName || candidateResumeDocId }}
-                  <span v-if="candidateResume.fileType"> · {{ candidateResume.fileType }}</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <el-tag type="info">个人上传</el-tag>
-                <el-button v-if="candidateOriginalUrl" link type="primary" @click="openOriginal">打开原件</el-button>
-                <el-button v-if="candidateOriginalUrl" link @click="downloadOriginal">下载原件</el-button>
-              </div>
-            </div>
-
-            <el-alert
-              v-if="candidateResume.originalAvailable === false"
-              class="mt-3"
-              type="warning"
-              :closable="false"
-              title="这份历史简历没有保存原始文件，请让个人端重新上传后再查看原件。"
-            />
-
-            <div v-else-if="candidateOriginalLoading" class="mt-4 text-sm text-zinc-600">正在加载原件...</div>
-
-            <div v-else-if="candidateOriginalUrl && candidateIsPdf" class="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
-              <object :data="candidatePdfPreviewUrl" type="application/pdf" class="h-[360px] w-full bg-white md:h-[420px]">
-                <div class="flex h-[360px] items-center justify-center bg-white text-sm text-zinc-600 md:h-[420px]">
-                  当前环境不支持内嵌 PDF 预览，请使用“打开原件”查看。
-                </div>
-              </object>
-            </div>
-
-            <div v-else-if="candidateOriginalUrl" class="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-              <div class="text-sm text-zinc-700">当前原件是 Word 文档，请使用“打开原件”或“下载原件”查看。</div>
-            </div>
-
-            <div v-else class="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
-              暂时无法加载这份原件。
-            </div>
-          </el-card>
-
-          <el-card v-if="isCompany && candidateResume" shadow="never">
-            <div class="text-sm font-semibold text-zinc-700">简历分析</div>
-
-            <div v-if="candidateResumeSkills.length" class="mt-3 flex flex-wrap gap-2">
-              <el-tag
-                v-for="skill in candidateResumeSkills"
-                :key="skill"
-                type="success"
-                class="max-w-full whitespace-normal break-all py-1 leading-6"
-              >
-                {{ skill }}
-              </el-tag>
-            </div>
-
-            <pre
-              v-if="candidateResumeAnalysis"
-              class="mt-4 whitespace-pre-wrap rounded-lg bg-zinc-50 p-3 text-sm leading-6 text-zinc-800"
-            >{{ candidateResumeAnalysis }}</pre>
-
-            <div v-else class="mt-3 text-sm text-zinc-600">暂无简历分析。</div>
-          </el-card>
-
-          <el-card shadow="never">
-            <div class="text-sm font-semibold text-zinc-700">技能覆盖</div>
-            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div v-if="!isCompany" class="rounded-lg border border-zinc-200 bg-white p-3">
-                <div class="text-xs text-zinc-500">已满足</div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <el-tag
-                    v-for="s in detail.matchedSkills"
-                    :key="s.name"
-                    type="success"
-                    class="max-w-full whitespace-normal break-all py-1 leading-6"
-                  >
-                    {{ s.name }}
-                  </el-tag>
-                  <div v-if="detail.matchedSkills.length === 0" class="text-sm text-zinc-600">暂无</div>
-                </div>
-              </div>
-              <div class="rounded-lg border border-zinc-200 bg-white p-3">
-                <div class="text-xs text-zinc-500">建议</div>
-                <ul class="mt-2 space-y-1 text-sm text-zinc-700">
-                  <li v-for="(s, idx) in detail.suggestions || []" :key="idx">{{ s }}</li>
-                  <li v-if="(detail.suggestions || []).length === 0" class="text-zinc-600">暂无</li>
-                </ul>
-              </div>
-            </div>
-          </el-card>
-
-          <el-card shadow="never">
-            <div class="text-sm font-semibold text-zinc-700">证据</div>
-            <div class="mt-3">
-              <el-table :data="detail.evidences || []" size="small">
-                <el-table-column prop="type" label="类型" width="100" />
-                <el-table-column prop="field" label="字段" width="140" />
-                <el-table-column prop="weight" label="权重" width="90" />
-                <el-table-column prop="snippet" label="内容" />
-              </el-table>
-            </div>
-          </el-card>
-
-          <el-card shadow="never">
-            <div class="flex items-center justify-between gap-2">
-              <div class="text-sm font-semibold text-zinc-700">你的反馈</div>
-              <el-button v-if="feedbackList.length" link type="danger" @click="clearFeedback">清空</el-button>
-            </div>
-            <div class="mt-3 space-y-2">
-              <div v-for="f in feedbackList" :key="f.id" class="rounded-lg border border-zinc-200 bg-white p-3">
-                <div class="flex items-center justify-between">
-                  <el-rate :model-value="f.rating" disabled />
-                  <div class="text-xs text-zinc-500">{{ fmt(f.createdAt) }}</div>
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <el-tag v-for="t in f.tags" :key="t" type="info">{{ t }}</el-tag>
-                </div>
-                <div class="mt-2 text-sm text-zinc-700">{{ f.comment }}</div>
-              </div>
-              <div v-if="feedbackList.length === 0" class="text-sm text-zinc-600">暂无</div>
-            </div>
-          </el-card>
+          </div>
         </div>
+
+        <!-- Matched Skills & Suggestions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div v-if="!isCompany" class="rounded-2xl border border-emerald-200 dark:border-emerald-900/30 bg-app-panel dark:bg-slate-900 p-5">
+            <h3 class="text-sm font-bold text-app-text dark:text-slate-200 mb-4 flex items-center gap-2">
+              <CheckCircle2 class="w-4 h-4 text-emerald-500" />
+              已匹配技能
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              <el-tag
+                v-for="s in detail.matchedSkills"
+                :key="s.name"
+                type="success"
+                class="!bg-emerald-50 !text-emerald-700 !border-emerald-200 dark:!bg-emerald-900/30 dark:!text-emerald-300 dark:!border-emerald-800 py-1 h-auto leading-normal px-3"
+                round
+              >
+                {{ s.name }}
+              </el-tag>
+              <div v-if="detail.matchedSkills.length === 0" class="text-sm text-app-subtext w-full text-center py-4 bg-app-bg dark:bg-slate-800/50 rounded-xl">无直接匹配项</div>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-amber-200 dark:border-amber-900/30 bg-app-panel dark:bg-slate-900 p-5" :class="{'md:col-span-2': isCompany}">
+            <h3 class="text-sm font-bold text-app-text dark:text-slate-200 mb-4 flex items-center gap-2">
+              <Star class="w-4 h-4 text-amber-500" />
+              发展与提升建议
+            </h3>
+            <ul class="space-y-3">
+              <li v-for="(s, idx) in detail.suggestions || []" :key="idx" class="text-sm text-app-text dark:text-slate-300 leading-relaxed bg-amber-50/50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/20">
+                {{ s }}
+              </li>
+              <li v-if="(detail.suggestions || []).length === 0" class="text-sm text-app-subtext text-center py-4">系统认为当前状态较好，暂无补充建议。</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Original Resume Section (Company Only) -->
+        <div v-if="isCompany && candidateResume" class="rounded-2xl border border-app-border dark:border-slate-800 bg-app-panel dark:bg-slate-900 p-5">
+          <div class="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-app-text dark:text-slate-200 flex items-center gap-2">
+                <User class="w-4 h-4 text-indigo-500" />候选人原始简历
+              </h3>
+              <div class="mt-1 text-xs text-app-subtext font-mono">
+                {{ candidateResume.fileName || candidateResumeDocId }}
+              </div>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <el-button v-if="candidateOriginalUrl" type="primary" plain class="flex-1 sm:flex-none" @click="openOriginal">
+                <ExternalLink class="w-4 h-4 mr-1" /> 独立窗口打开
+              </el-button>
+              <el-button v-if="candidateOriginalUrl" type="info" plain class="flex-1 sm:flex-none" @click="downloadOriginal">
+                <Download class="w-4 h-4" />
+              </el-button>
+            </div>
+          </div>
+
+          <el-alert
+            v-if="candidateResume.originalAvailable === false"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="!rounded-xl"
+            title="此份历史简历未保存原始文件格式，建议提醒求职者重新上传。"
+          />
+
+          <div v-else-if="candidateOriginalLoading" class="py-12 flex justify-center text-app-subtext">
+            <RefreshCw class="w-6 h-6 animate-spin text-indigo-500 mr-2" /> 正在加载原始文档...
+          </div>
+
+          <div v-else-if="candidateOriginalUrl && candidateIsPdf" class="overflow-hidden rounded-xl border border-app-border dark:border-slate-700 bg-app-bg dark:bg-slate-800">
+            <object :data="candidatePdfPreviewUrl" type="application/pdf" class="h-[500px] w-full">
+              <div class="flex h-[500px] items-center justify-center text-sm text-app-subtext">
+                当前浏览器环境不支持内嵌 PDF 预览，请点击右上角按钮查看。
+              </div>
+            </object>
+          </div>
+
+          <div v-else-if="candidateOriginalUrl" class="rounded-xl border border-app-border dark:border-slate-700 bg-app-bg dark:bg-slate-800/50 p-8 text-center">
+            <FileText class="w-12 h-12 text-app-subtext mx-auto mb-3" />
+            <div class="text-sm text-app-text dark:text-slate-300 font-medium">当前简历是 Word 格式</div>
+            <div class="text-xs text-app-subtext mt-1">出于兼容性考虑，请下载或在新窗口中打开查看。</div>
+          </div>
+        </div>
+
+        <!-- Evidences Table -->
+        <div class="rounded-2xl border border-app-border dark:border-slate-800 bg-app-panel dark:bg-slate-900 p-5">
+          <h3 class="text-sm font-bold text-app-text dark:text-slate-200 mb-4 flex items-center gap-2">
+            <Database class="w-4 h-4 text-app-subtext" />
+            分析证据追溯
+          </h3>
+          <div class="rounded-xl overflow-hidden border border-app-border dark:border-slate-700">
+            <el-table :data="detail.evidences || []" style="width: 100%" :header-cell-style="{ background: 'var(--el-fill-color-light)' }">
+              <el-table-column prop="type" label="能力类型" width="120">
+                <template #default="{ row }">
+                  <el-tag size="small" type="info" class="!bg-app-bg dark:!bg-slate-800 !border-none text-app-text dark:text-slate-300 font-bold">{{ row.type }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="field" label="考察字段" width="140" />
+              <el-table-column prop="weight" label="模型权重" width="90">
+                <template #default="{ row }">
+                  <span class="font-mono text-xs text-indigo-600 dark:text-indigo-400">{{ row.weight }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="snippet" label="原文提取片段" min-width="300" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span class="text-app-text dark:text-app-subtext">{{ row.snippet }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+
       </div>
-    </el-card>
+    </div>
   </div>
 
-  <el-dialog v-model="feedbackDlg" title="提交反馈" width="560px">
+  <!-- Dialogs & Drawers ... (Keep existing feedback & chat UI but use updated styles) -->
+  <el-dialog v-model="feedbackDlg" title="提交人工评价反馈" width="500px" class="!rounded-2xl">
     <el-form label-position="top">
-      <el-form-item label="满意度">
-        <el-rate v-model="feedbackForm.rating" />
+      <el-form-item label="本次匹配质量打分">
+        <el-rate v-model="feedbackForm.rating" size="large" />
       </el-form-item>
-      <el-form-item label="标签">
-        <el-checkbox-group v-model="feedbackForm.tags">
-          <el-checkbox v-for="t in feedbackTags" :key="t.value" :label="t.value">{{ t.label }}</el-checkbox>
+      <el-form-item label="存在的问题 (可选)">
+        <el-checkbox-group v-model="feedbackForm.tags" class="flex flex-col gap-2">
+          <el-checkbox v-for="t in feedbackTags" :key="t.value" :label="t.value" :value="t.value" border class="!mr-0">{{ t.label }}</el-checkbox>
         </el-checkbox-group>
       </el-form-item>
-      <el-form-item label="说明">
+      <el-form-item label="详细说明">
         <el-input
           v-model="feedbackForm.comment"
           type="textarea"
           :rows="4"
-          placeholder="说明你认为不准确或不合理的原因，便于后续优化。"
+          placeholder="请说明您认为不准确或不合理的原因，帮助模型迭代优化..."
         />
       </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="feedbackDlg = false">取消</el-button>
-      <el-button type="primary" @click="submitFeedback">提交</el-button>
+      <el-button type="primary" @click="submitFeedback" class="!bg-indigo-600 hover:!bg-indigo-700 !border-none">提交评价</el-button>
     </template>
   </el-dialog>
 
-  <el-drawer v-model="chatDrawerOpen" size="460px" :with-header="false" destroy-on-close>
+  <!-- Chat Drawer (Stylized) -->
+  <el-drawer v-model="chatDrawerOpen" size="460px" :with-header="false" destroy-on-close class="!bg-app-bg dark:!bg-slate-950">
     <div class="flex h-full flex-col">
-      <div class="border-b border-zinc-200 px-5 py-4">
+      <div class="bg-app-panel dark:bg-slate-900 border-b border-app-border dark:border-slate-800 px-6 py-5 shadow-sm z-10">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <div class="text-base font-semibold text-zinc-900">聊一聊</div>
-            <div class="mt-1 text-sm text-zinc-600">{{ chatCounterpartLabel }}</div>
-            <div class="mt-1 text-xs text-zinc-500">{{ chatContextText }}</div>
+            <div class="text-lg font-bold text-app-text dark:text-white flex items-center gap-2">
+              <MessageSquare class="w-5 h-5 text-emerald-500" />
+              在线沟通
+            </div>
+            <div class="mt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">{{ chatCounterpartLabel }}</div>
+            <div class="mt-1 text-xs text-app-subtext truncate max-w-[300px]">{{ chatContextText }}</div>
           </div>
-          <el-button text @click="chatDrawerOpen = false">关闭</el-button>
+          <el-button circle @click="chatDrawerOpen = false" class="!border-none !bg-app-bg hover:!bg-slate-200 dark:!bg-slate-800">✕</el-button>
         </div>
       </div>
 
-      <div ref="chatScrollRef" class="flex-1 overflow-y-auto bg-zinc-50 px-4 py-4">
-        <div v-if="activeThreadMessages.length === 0" class="flex h-full items-center justify-center text-sm text-zinc-500">
-          先打个招呼吧。
+      <div ref="chatScrollRef" class="flex-1 overflow-y-auto px-5 py-6">
+        <div v-if="activeThreadMessages.length === 0" class="flex flex-col h-full items-center justify-center text-app-subtext">
+          <MessageSquare class="w-12 h-12 mb-3 opacity-20" />
+          <span class="text-sm">暂无聊天记录，主动打个招呼吧。</span>
         </div>
-        <div v-else class="space-y-3">
+        <div v-else class="space-y-6">
           <div
             v-for="msg in activeThreadMessages"
             :key="msg.id"
@@ -660,36 +729,44 @@ onBeforeUnmount(revokeOriginalUrl)
             :class="msg.senderRole === side ? 'justify-end' : 'justify-start'"
           >
             <div
-              class="max-w-[82%] rounded-lg border border-zinc-200 px-3 py-2 text-sm leading-6 shadow-sm"
-              :class="msg.senderRole === side ? 'border-emerald-500 bg-emerald-500 text-white' : 'bg-white text-zinc-800'"
+              class="max-w-[85%] relative group"
             >
-              <div class="text-xs opacity-80">{{ msg.senderName }}</div>
-              <div class="mt-1 whitespace-pre-wrap break-words">{{ msg.text }}</div>
-              <div class="mt-1 text-[11px] opacity-70">{{ fmt(msg.createdAt) }}</div>
+              <div class="text-[11px] font-medium text-app-subtext mb-1" :class="msg.senderRole === side ? 'text-right' : 'text-left'">
+                {{ msg.senderName }} · {{ fmt(msg.createdAt).split(' ')[1] }}
+              </div>
+              <div
+                class="px-4 py-3 text-sm leading-relaxed shadow-sm break-words"
+                :class="msg.senderRole === side 
+                  ? 'rounded-2xl rounded-tr-sm bg-emerald-500 text-white' 
+                  : 'rounded-2xl rounded-tl-sm bg-app-panel dark:bg-slate-800 text-app-text dark:text-slate-200 border border-app-border dark:border-slate-700'"
+              >
+                <div class="whitespace-pre-wrap">{{ msg.text }}</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="border-t border-zinc-200 bg-white px-4 py-4">
+      <div class="bg-app-panel dark:bg-slate-900 border-t border-app-border dark:border-slate-800 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <el-input
           v-model="chatDraft"
           type="textarea"
-          :rows="4"
+          :rows="3"
           resize="none"
-          placeholder="输入想和对方聊的内容"
+          placeholder="输入消息，按 Enter 发送..."
+          class="!text-sm"
           @keydown.enter.exact.prevent="sendChatMessage"
         />
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div class="text-xs text-zinc-500">Enter 发送</div>
-          <button
-            type="button"
-            class="inline-flex h-10 w-28 items-center justify-center rounded-md bg-emerald-500 px-4 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
+        <div class="mt-3 flex items-center justify-between">
+          <div class="text-[11px] text-app-subtext px-2">Enter 发送 / Shift+Enter 换行</div>
+          <el-button
+            type="success"
             :disabled="!chatDraft.trim() || !chatThread"
             @click="sendChatMessage"
+            class="!px-6 !rounded-lg shadow-sm"
           >
             发送
-          </button>
+          </el-button>
         </div>
       </div>
     </div>

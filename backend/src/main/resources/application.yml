@@ -8,12 +8,12 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
-  # openGauss（PostgreSQL 兼容协议），使用 opengauss-jdbc + Flyway 建表与种子数据
+  # KingbaseES（PostgreSQL 兼容协议），统一使用 PostgreSQL JDBC / 方言以减少迁移改动
   datasource:
-    url: jdbc:opengauss://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:aimap}?currentSchema=public&stringtype=unspecified
-    username: ${DB_USER:aimap}
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:54321}/${DB_NAME:test}?currentSchema=public&stringtype=unspecified
+    username: ${DB_USER:system}
     password: ${DB_PASSWORD:}
-    driver-class-name: org.opengauss.Driver
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: validate

@@ -154,24 +154,24 @@ const fmt = (iso?: string) => {
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="text-base font-semibold">用户管理</div>
-          <div class="mt-1 text-sm text-zinc-600">当前列表直接读取数据库用户表，支持新增、编辑、启用、禁用、重置密码与删除。</div>
+          <div class="mt-1 text-sm text-app-subtext">当前列表直接读取数据库用户表，支持新增、编辑、启用、禁用、重置密码与删除。</div>
         </div>
       </div>
     </el-card>
 
     <el-card shadow="never">
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <el-input v-model="query.account" placeholder="账号" clearable />
-        <el-select v-model="query.userType" placeholder="角色" clearable>
+      <div class="flex items-center gap-3">
+        <el-input v-model="query.account" placeholder="账号" clearable class="w-[200px]" />
+        <el-select v-model="query.userType" placeholder="角色" clearable class="w-[160px]">
           <el-option label="个人" value="PERSON" />
           <el-option label="企业" value="COMPANY" />
           <el-option label="管理员" value="ADMIN" />
         </el-select>
-        <el-select v-model="query.status" placeholder="状态" clearable>
+        <el-select v-model="query.status" placeholder="状态" clearable class="w-[140px]">
           <el-option label="启用" value="ACTIVE" />
           <el-option label="禁用" value="DISABLED" />
         </el-select>
-        <div class="flex items-center justify-end gap-2">
+        <div class="flex items-center gap-2 ml-auto">
           <el-button v-permission="'ADMIN_USERS_VIEW'" type="primary" @click="openCreate">新增用户</el-button>
           <el-button v-permission="'ADMIN_USERS_VIEW'" @click="exportJson">导出 JSON</el-button>
           <el-button v-permission="'ADMIN_USERS_VIEW'" @click="exportCsv">导出 CSV</el-button>
@@ -192,12 +192,12 @@ const fmt = (iso?: string) => {
           <el-table-column prop="email" label="邮箱" min-width="220" />
           <el-table-column prop="createdAt" label="创建时间" width="180">
             <template #default="{ row }">
-              <span class="text-xs text-zinc-600">{{ fmt(row.createdAt) }}</span>
+              <span class="text-xs text-app-subtext">{{ fmt(row.createdAt) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="lastLoginAt" label="最近登录" width="180">
             <template #default="{ row }">
-              <span class="text-xs text-zinc-600">{{ fmt(row.lastLoginAt) }}</span>
+              <span class="text-xs text-app-subtext">{{ fmt(row.lastLoginAt) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="260" fixed="right">

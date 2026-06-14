@@ -1,9 +1,9 @@
--- 在 openGauss 上以管理员账号（如 omm / gaussdb）执行一次，然后启动 Spring Boot 应用。
--- 示例：gsql -d postgres -U omm -W -f setup-aimap.sql
+-- 在 KingbaseES 上以管理员账号（如 system）执行一次，然后启动 Spring Boot 应用。
+-- 示例：ksql -d test -U system -W -f setup-aimap.sql
 
-CREATE DATABASE aimap ENCODING 'UTF8' TEMPLATE template0;
+CREATE DATABASE aimap;
 
-CREATE USER aimap IDENTIFIED BY 'AimapDev1!';
+CREATE USER aimap WITH PASSWORD 'AimapDev1!';
 
 GRANT ALL PRIVILEGES ON DATABASE aimap TO aimap;
 

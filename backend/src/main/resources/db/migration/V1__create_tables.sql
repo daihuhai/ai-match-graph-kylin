@@ -1,4 +1,4 @@
--- openGauss / PostgreSQL compatible
+-- KingbaseES / PostgreSQL compatible
 
 CREATE OR REPLACE FUNCTION aimap_touch_updated_at()
 RETURNS TRIGGER AS $$

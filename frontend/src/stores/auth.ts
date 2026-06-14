@@ -32,6 +32,7 @@ export const useAuthStore = defineStore('auth', {
         this.userId = data.userId ?? ''
         this.permissions = Array.isArray(data.permissions) ? data.permissions : []
       } catch {
+        console.warn('[auth] sessionStorage 数据解析失败，已清除')
         sessionStorage.removeItem(STORAGE_KEY)
       }
     },

@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Flyway uses PostgreSQL-compatible JDBC. With openGauss, ensure the app user's
- * {@code search_path} is {@code public} only (not {@code "$user",public}) so Flyway does not
- * issue {@code SET ROLE}; see ensure-dev-db.ps1.
+ * Flyway uses PostgreSQL-compatible JDBC. For KingbaseES / openGauss style databases, keep
+ * Flyway on the PostgreSQL driver even if the application datasource URL later changes to a
+ * vendor-specific JDBC prefix.
  */
 @Configuration
 public class FlywayDataSourceConfig {
@@ -22,17 +22,17 @@ public class FlywayDataSourceConfig {
       @Value("${spring.datasource.username}") String username,
       @Value("${spring.datasource.password}") String password) {
     HikariDataSource ds = new HikariDataSource();
-    ds.setJdbcUrl(toPostgresqlJdbcUrl(url));
+    ds.setJdbcUrl(toFlywayJdbcUrl(url));
     ds.setUsername(username);
     ds.setPassword(password);
     ds.setDriverClassName("org.postgresql.Driver");
     return ds;
   }
 
-  static String toPostgresqlJdbcUrl(String openGaussUrl) {
-    if (openGaussUrl == null) {
+  static String toFlywayJdbcUrl(String jdbcUrl) {
+    if (jdbcUrl == null) {
       return null;
     }
-    return openGaussUrl.replaceFirst("^jdbc:opengauss:", "jdbc:postgresql:");
+    return jdbcUrl.replaceFirst("^jdbc:(opengauss|kingbase8):", "jdbc:postgresql:");
   }
 }

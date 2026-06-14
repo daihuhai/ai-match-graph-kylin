@@ -1,6 +1,6 @@
 package com.aimap.backend.controller;
 
-import com.aimap.backend.auth.TokenAccountCodec;
+import com.aimap.backend.auth.BearerUserResolver;
 import com.aimap.backend.common.ApiResponse;
 import com.aimap.backend.service.InMemoryDataService;
 import jakarta.validation.constraints.NotBlank;
@@ -47,7 +47,7 @@ public class AuthController {
         : List.of();
     return ApiResponse.ok(Map.of(
         "token",
-        "token-" + user.userType().toLowerCase() + "." + TokenAccountCodec.encode(user.account()),
+        BearerUserResolver.issueToken(user.userType(), user.account()),
         "userType", user.userType(),
         "userId", user.account(),
         "permissions", permissions));
